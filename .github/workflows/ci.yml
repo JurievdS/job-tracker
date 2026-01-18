@@ -9,7 +9,7 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:16
@@ -31,24 +31,30 @@ jobs:
       DB_USER: dev
       DB_PASSWORD: dev
       DB_NAME: job_tracker
+      JWT_SECRET: test-secret-key-for-ci-minimum-32-chars
+
+    defaults:
+      run:
+        working-directory: backend
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
-      
+          cache-dependency-path: backend/package-lock.json
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Compile TypeScript
         run: npx tsc
-      
+
       - name: Setup database
         run: node dist/setup.js
-      
+
       - name: Run tests
         run: npm test
