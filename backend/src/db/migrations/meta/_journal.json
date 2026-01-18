@@ -8,6 +8,13 @@
       "when": 1768667601907,
       "tag": "0000_uneven_omega_red",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1768729274988,
+      "tag": "0001_lying_tyger_tiger",
+      "breakpoints": true
     }
   ]
 }

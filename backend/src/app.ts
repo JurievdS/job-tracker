@@ -2,15 +2,25 @@ import express from "express";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./swagger.js";
 import router from "./routes/index.js";
-import { errorHandler,asyncHandler } from "./middleware/errorHandler.js";
+import authRouter from "./routes/auth.js";
+import { errorHandler } from "./middleware/errorHandler.js";
+import { authenticate } from "./middleware/auth.js";
+import passport from "./config/passport.js";
 
 const app = express();
 app.use(express.json());
+app.use(passport.initialize());
 
-app.use("/", router);
-app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// Public routes (no authentication required)
+app.use("/auth", authRouter);
+
+if (process.env.NODE_ENV !== "production") {
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+}
+
+// Protected routes (authentication required)
+app.use("/", authenticate, router);
+
 app.use(errorHandler);
-
-
 
 export default app;
