@@ -11,12 +11,14 @@ A full-stack application to manage your job search workflow - track applications
 
 ## Features
 
+- **User Authentication** - Email/password registration, Google OAuth, GitHub OAuth
 - **Application Tracking** - Monitor applications through stages: bookmarked, pending, interview, offer, rejected
 - **Company Database** - Store company details, ratings, and notes
 - **Position Management** - Track job postings with salary ranges and requirements
 - **Contact Network** - Keep records of recruiters and hiring managers
 - **Interaction Log** - Record emails, calls, and interviews
 - **Reminders** - Never miss a follow-up
+- **User Scoping** - All data is private to each user
 
 ## Project Structure
 
@@ -41,6 +43,13 @@ docker compose up -d
 
 See individual READMEs for detailed setup:
 - [Backend](./backend/README.md)
+
+## Development Workflow
+
+- Work on `development` branch
+- Create PRs to `main`
+- After merge, `development` auto-syncs via GitHub Action
+- Run `git pull` on local `development` to continue
 
 ## License
 
