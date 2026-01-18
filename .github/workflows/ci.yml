@@ -54,7 +54,7 @@ jobs:
         run: npx tsc
 
       - name: Setup database
-        run: node dist/setup.js
+        run: npm run db:migrate
 
       - name: Run tests
         run: npm test
