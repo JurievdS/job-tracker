@@ -1,5 +1,25 @@
 import { pgTable, serial, varchar, text, integer, timestamp, date, boolean } from "drizzle-orm/pg-core";
 
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).unique(),
+  password_hash: varchar("password_hash", { length: 255 }),
+  name: varchar("name", { length: 255 }),
+  avatar_url: varchar("avatar_url", { length: 500 }),
+  google_id: varchar("google_id", { length: 255 }).unique(),
+  github_id: varchar("github_id", { length: 255 }).unique(),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
+});
+
+export const refreshTokens = pgTable("refresh_tokens", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  token_hash: varchar("token_hash", { length: 255 }).notNull(),
+  expires_at: timestamp("expires_at").notNull(),
+  created_at: timestamp("created_at").defaultNow(),
+});
+
 export const applications = pgTable("applications", {
   id: serial("id").primaryKey(),
   position_id: integer("position_id").references(() => positions.id, { onDelete: "cascade" }),
@@ -12,6 +32,7 @@ export const applications = pgTable("applications", {
 
 export const companies = pgTable("companies", {
   id: serial("id").primaryKey(),
+  user_id: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   website: varchar("website", { length: 255 }),
   location: varchar("location", { length: 255 }),

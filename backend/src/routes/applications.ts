@@ -3,7 +3,7 @@ import { z } from "zod";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { db } from "../db/index.js";
 import { applications, positions, companies } from "../db/schema.js";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { ApplicationSchema, UpdateApplicationSchema } from "../schemas/applications.js";
 
 const router = Router();
@@ -63,10 +63,10 @@ router.get("/", asyncHandler(async (req: Request, res: Response) => {
     .innerJoin(companies, eq(positions.company_id, companies.id))
     .orderBy(desc(applications.updated_at));
 
-  // Filter by status if provided
+  // Filter by status if provided, always filter by user
   const result = req.query.status
-    ? await baseQuery.where(eq(applications.status, req.query.status as string))
-    : await baseQuery;
+    ? await baseQuery.where(and(eq(applications.status, req.query.status as string), eq(companies.user_id, req.userId!)))
+    : await baseQuery.where(eq(companies.user_id, req.userId!));
 
   res.json(result);
 }));
@@ -105,7 +105,7 @@ router.get("/:id", asyncHandler(async (req: Request, res: Response) => {
     .from(applications)
     .innerJoin(positions, eq(applications.position_id, positions.id))
     .innerJoin(companies, eq(positions.company_id, companies.id))
-    .where(eq(applications.id, Number(req.params.id)));
+    .where(and(eq(applications.id, Number(req.params.id)), eq(companies.user_id, req.userId!)));
 
   if (result.length === 0) {
     res.status(404).json({ error: "Application not found" });
@@ -132,6 +132,18 @@ router.get("/:id", asyncHandler(async (req: Request, res: Response) => {
  */
 router.post("/", asyncHandler(async (req: Request, res: Response) => {
   const data = ApplicationSchema.parse(req.body);
+
+  // Verify position belongs to user via company
+  const position = await db
+    .select({ id: positions.id })
+    .from(positions)
+    .innerJoin(companies, eq(positions.company_id, companies.id))
+    .where(and(eq(positions.id, data.position_id), eq(companies.user_id, req.userId!)));
+
+  if (position.length === 0) {
+    res.status(404).json({ error: "Position not found" });
+    return;
+  }
 
   const result = await db
     .insert(applications)
@@ -172,6 +184,34 @@ router.post("/", asyncHandler(async (req: Request, res: Response) => {
  */
 router.put("/:id", asyncHandler(async (req: Request, res: Response) => {
   const data = UpdateApplicationSchema.parse(req.body);
+  const applicationId = Number(req.params.id);
+
+  // Verify application belongs to user via position -> company
+  const existingApplication = await db
+    .select({ id: applications.id })
+    .from(applications)
+    .innerJoin(positions, eq(applications.position_id, positions.id))
+    .innerJoin(companies, eq(positions.company_id, companies.id))
+    .where(and(eq(applications.id, applicationId), eq(companies.user_id, req.userId!)));
+
+  if (existingApplication.length === 0) {
+    res.status(404).json({ error: "Application not found" });
+    return;
+  }
+
+  // If updating position_id, verify new position belongs to user
+  if (data.position_id) {
+    const position = await db
+      .select({ id: positions.id })
+      .from(positions)
+      .innerJoin(companies, eq(positions.company_id, companies.id))
+      .where(and(eq(positions.id, data.position_id), eq(companies.user_id, req.userId!)));
+
+    if (position.length === 0) {
+      res.status(404).json({ error: "Position not found" });
+      return;
+    }
+  }
 
   const result = await db
     .update(applications)
@@ -179,13 +219,9 @@ router.put("/:id", asyncHandler(async (req: Request, res: Response) => {
       ...data,
       updated_at: new Date(),
     })
-    .where(eq(applications.id, Number(req.params.id)))
+    .where(eq(applications.id, applicationId))
     .returning();
 
-  if (result.length === 0) {
-    res.status(404).json({ error: "Application not found" });
-    return;
-  }
   res.json(result[0]);
 }));
 
@@ -220,6 +256,20 @@ router.patch("/:id/status", asyncHandler(async (req: Request, res: Response) => 
   const { status } = z.object({
     status: ApplicationSchema.shape.status,
   }).parse(req.body);
+  const applicationId = Number(req.params.id);
+
+  // Verify application belongs to user via position -> company
+  const existingApplication = await db
+    .select({ id: applications.id })
+    .from(applications)
+    .innerJoin(positions, eq(applications.position_id, positions.id))
+    .innerJoin(companies, eq(positions.company_id, companies.id))
+    .where(and(eq(applications.id, applicationId), eq(companies.user_id, req.userId!)));
+
+  if (existingApplication.length === 0) {
+    res.status(404).json({ error: "Application not found" });
+    return;
+  }
 
   const result = await db
     .update(applications)
@@ -227,13 +277,9 @@ router.patch("/:id/status", asyncHandler(async (req: Request, res: Response) => 
       status,
       updated_at: new Date(),
     })
-    .where(eq(applications.id, Number(req.params.id)))
+    .where(eq(applications.id, applicationId))
     .returning();
 
-  if (result.length === 0) {
-    res.status(404).json({ error: "Application not found" });
-    return;
-  }
   res.json(result[0]);
 }));
 
@@ -256,15 +302,22 @@ router.patch("/:id/status", asyncHandler(async (req: Request, res: Response) => 
  *         description: Application not found
  */
 router.delete("/:id", asyncHandler(async (req: Request, res: Response) => {
-  const result = await db
-    .delete(applications)
-    .where(eq(applications.id, Number(req.params.id)))
-    .returning();
+  const applicationId = Number(req.params.id);
 
-  if (result.length === 0) {
+  // Verify application belongs to user via position -> company
+  const existingApplication = await db
+    .select({ id: applications.id })
+    .from(applications)
+    .innerJoin(positions, eq(applications.position_id, positions.id))
+    .innerJoin(companies, eq(positions.company_id, companies.id))
+    .where(and(eq(applications.id, applicationId), eq(companies.user_id, req.userId!)));
+
+  if (existingApplication.length === 0) {
     res.status(404).json({ error: "Application not found" });
     return;
   }
+
+  await db.delete(applications).where(eq(applications.id, applicationId));
   res.status(204).send();
 }));
 

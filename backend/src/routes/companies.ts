@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { db } from "../db/index.js";
 import { companies } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { CompanySchema, UpdateCompanySchema } from "../schemas/companies.js";
 
 const router = Router();
@@ -43,7 +43,7 @@ const router = Router();
 router.get(
   "/",
   asyncHandler(async (req: Request, res: Response) => {
-    const result = await db.select().from(companies);
+    const result = await db.select().from(companies).where(eq(companies.user_id, req.userId!));
     res.json(result);
   }),
 );
@@ -73,7 +73,7 @@ router.get(
     const result = await db
       .select()
       .from(companies)
-      .where(eq(companies.id, id));
+      .where(and(eq(companies.id, id), eq(companies.user_id, req.userId!)));
     if (result.length === 0) {
       res.status(404).json({ error: "Company not found" });
       return;
@@ -106,6 +106,7 @@ router.post(
     const result = await db
       .insert(companies)
       .values({
+        user_id: req.userId!,
         name: data.name,
         website: data.website,
         location: data.location,
@@ -156,7 +157,7 @@ router.put(
         notes: data.notes,
         rating: data.rating,
       })
-      .where(eq(companies.id, id))
+      .where(and(eq(companies.id, id), eq(companies.user_id, req.userId!)))
       .returning();
 
     if (result.length === 0) {
@@ -191,7 +192,7 @@ router.delete(
     const id = Number(req.params.id);
     const result = await db
       .delete(companies)
-      .where(eq(companies.id, id))
+      .where(and(eq(companies.id, id), eq(companies.user_id, req.userId!)))
       .returning();
 
     if (result.length === 0) {

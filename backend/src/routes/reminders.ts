@@ -3,7 +3,7 @@ import { asyncHandler } from "../middleware/errorHandler.js";
 import { db } from "../db/index.js";
 import { reminders, applications, positions, companies } from "../db/schema.js";
 import { eq, and, lte, asc, sql } from "drizzle-orm";
-import { ReminderSchema, UpdateReminderSchema } from "../schemas/reminders.js";
+import { ReminderSchema } from "../schemas/reminders.js";
 
 const router = Router();
 
@@ -65,10 +65,11 @@ router.get("/", asyncHandler(async (req: Request, res: Response) => {
     ? await baseQuery.where(
         and(
           eq(reminders.completed, false),
-          lte(reminders.reminder_date, sql`CURRENT_DATE`)
+          lte(reminders.reminder_date, sql`CURRENT_DATE`),
+          eq(companies.user_id, req.userId!)
         )
       )
-    : await baseQuery;
+    : await baseQuery.where(eq(companies.user_id, req.userId!));
 
   res.json(result);
 }));
@@ -107,7 +108,7 @@ router.get("/:id", asyncHandler(async (req: Request, res: Response) => {
     .innerJoin(applications, eq(reminders.application_id, applications.id))
     .innerJoin(positions, eq(applications.position_id, positions.id))
     .innerJoin(companies, eq(positions.company_id, companies.id))
-    .where(eq(reminders.id, Number(req.params.id)));
+    .where(and(eq(reminders.id, Number(req.params.id)), eq(companies.user_id, req.userId!)));
 
   if (result.length === 0) {
     res.status(404).json({ error: "Reminder not found" });
@@ -134,6 +135,19 @@ router.get("/:id", asyncHandler(async (req: Request, res: Response) => {
  */
 router.post("/", asyncHandler(async (req: Request, res: Response) => {
   const data = ReminderSchema.parse(req.body);
+
+  // Verify application belongs to user via position -> company
+  const application = await db
+    .select({ id: applications.id })
+    .from(applications)
+    .innerJoin(positions, eq(applications.position_id, positions.id))
+    .innerJoin(companies, eq(positions.company_id, companies.id))
+    .where(and(eq(applications.id, data.application_id), eq(companies.user_id, req.userId!)));
+
+  if (application.length === 0) {
+    res.status(404).json({ error: "Application not found" });
+    return;
+  }
 
   const result = await db
     .insert(reminders)
@@ -166,16 +180,28 @@ router.post("/", asyncHandler(async (req: Request, res: Response) => {
  *         description: Reminder not found
  */
 router.patch("/:id/complete", asyncHandler(async (req: Request, res: Response) => {
-  const result = await db
-    .update(reminders)
-    .set({ completed: true })
-    .where(eq(reminders.id, Number(req.params.id)))
-    .returning();
+  const reminderId = Number(req.params.id);
 
-  if (result.length === 0) {
+  // Verify reminder belongs to user via application -> position -> company
+  const existingReminder = await db
+    .select({ id: reminders.id })
+    .from(reminders)
+    .innerJoin(applications, eq(reminders.application_id, applications.id))
+    .innerJoin(positions, eq(applications.position_id, positions.id))
+    .innerJoin(companies, eq(positions.company_id, companies.id))
+    .where(and(eq(reminders.id, reminderId), eq(companies.user_id, req.userId!)));
+
+  if (existingReminder.length === 0) {
     res.status(404).json({ error: "Reminder not found" });
     return;
   }
+
+  const result = await db
+    .update(reminders)
+    .set({ completed: true })
+    .where(eq(reminders.id, reminderId))
+    .returning();
+
   res.json(result[0]);
 }));
 
@@ -198,15 +224,23 @@ router.patch("/:id/complete", asyncHandler(async (req: Request, res: Response) =
  *         description: Reminder not found
  */
 router.delete("/:id", asyncHandler(async (req: Request, res: Response) => {
-  const result = await db
-    .delete(reminders)
-    .where(eq(reminders.id, Number(req.params.id)))
-    .returning();
+  const reminderId = Number(req.params.id);
 
-  if (result.length === 0) {
+  // Verify reminder belongs to user via application -> position -> company
+  const existingReminder = await db
+    .select({ id: reminders.id })
+    .from(reminders)
+    .innerJoin(applications, eq(reminders.application_id, applications.id))
+    .innerJoin(positions, eq(applications.position_id, positions.id))
+    .innerJoin(companies, eq(positions.company_id, companies.id))
+    .where(and(eq(reminders.id, reminderId), eq(companies.user_id, req.userId!)));
+
+  if (existingReminder.length === 0) {
     res.status(404).json({ error: "Reminder not found" });
     return;
   }
+
+  await db.delete(reminders).where(eq(reminders.id, reminderId));
   res.status(204).send();
 }));
 

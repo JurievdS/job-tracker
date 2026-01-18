@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { db } from "../db/index.js";
 import { interactions, contacts, applications, positions, companies } from "../db/schema.js";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { InteractionSchema, UpdateInteractionSchema } from "../schemas/interactions.js";
 
 const router = Router();
@@ -68,8 +68,8 @@ router.get("/", asyncHandler(async (req: Request, res: Response) => {
     .orderBy(desc(interactions.interaction_date));
 
   const result = req.query.application_id
-    ? await baseQuery.where(eq(interactions.application_id, Number(req.query.application_id)))
-    : await baseQuery;
+    ? await baseQuery.where(and(eq(interactions.application_id, Number(req.query.application_id)), eq(companies.user_id, req.userId!)))
+    : await baseQuery.where(eq(companies.user_id, req.userId!));
 
   res.json(result);
 }));
@@ -111,7 +111,7 @@ router.get("/:id", asyncHandler(async (req: Request, res: Response) => {
     .innerJoin(applications, eq(interactions.application_id, applications.id))
     .innerJoin(positions, eq(applications.position_id, positions.id))
     .innerJoin(companies, eq(positions.company_id, companies.id))
-    .where(eq(interactions.id, Number(req.params.id)));
+    .where(and(eq(interactions.id, Number(req.params.id)), eq(companies.user_id, req.userId!)));
 
   if (result.length === 0) {
     res.status(404).json({ error: "Interaction not found" });
@@ -138,6 +138,33 @@ router.get("/:id", asyncHandler(async (req: Request, res: Response) => {
  */
 router.post("/", asyncHandler(async (req: Request, res: Response) => {
   const data = InteractionSchema.parse(req.body);
+
+  // Verify application belongs to user via position -> company
+  const application = await db
+    .select({ id: applications.id })
+    .from(applications)
+    .innerJoin(positions, eq(applications.position_id, positions.id))
+    .innerJoin(companies, eq(positions.company_id, companies.id))
+    .where(and(eq(applications.id, data.application_id), eq(companies.user_id, req.userId!)));
+
+  if (application.length === 0) {
+    res.status(404).json({ error: "Application not found" });
+    return;
+  }
+
+  // If contact_id provided, verify contact belongs to user via company
+  if (data.contact_id) {
+    const contact = await db
+      .select({ id: contacts.id })
+      .from(contacts)
+      .innerJoin(companies, eq(contacts.company_id, companies.id))
+      .where(and(eq(contacts.id, data.contact_id), eq(companies.user_id, req.userId!)));
+
+    if (contact.length === 0) {
+      res.status(404).json({ error: "Contact not found" });
+      return;
+    }
+  }
 
   const result = await db
     .insert(interactions)
@@ -179,6 +206,50 @@ router.post("/", asyncHandler(async (req: Request, res: Response) => {
  */
 router.put("/:id", asyncHandler(async (req: Request, res: Response) => {
   const data = UpdateInteractionSchema.parse(req.body);
+  const interactionId = Number(req.params.id);
+
+  // Verify interaction belongs to user via application -> position -> company
+  const existingInteraction = await db
+    .select({ id: interactions.id })
+    .from(interactions)
+    .innerJoin(applications, eq(interactions.application_id, applications.id))
+    .innerJoin(positions, eq(applications.position_id, positions.id))
+    .innerJoin(companies, eq(positions.company_id, companies.id))
+    .where(and(eq(interactions.id, interactionId), eq(companies.user_id, req.userId!)));
+
+  if (existingInteraction.length === 0) {
+    res.status(404).json({ error: "Interaction not found" });
+    return;
+  }
+
+  // If updating application_id, verify new application belongs to user
+  if (data.application_id) {
+    const application = await db
+      .select({ id: applications.id })
+      .from(applications)
+      .innerJoin(positions, eq(applications.position_id, positions.id))
+      .innerJoin(companies, eq(positions.company_id, companies.id))
+      .where(and(eq(applications.id, data.application_id), eq(companies.user_id, req.userId!)));
+
+    if (application.length === 0) {
+      res.status(404).json({ error: "Application not found" });
+      return;
+    }
+  }
+
+  // If updating contact_id, verify new contact belongs to user
+  if (data.contact_id) {
+    const contact = await db
+      .select({ id: contacts.id })
+      .from(contacts)
+      .innerJoin(companies, eq(contacts.company_id, companies.id))
+      .where(and(eq(contacts.id, data.contact_id), eq(companies.user_id, req.userId!)));
+
+    if (contact.length === 0) {
+      res.status(404).json({ error: "Contact not found" });
+      return;
+    }
+  }
 
   const result = await db
     .update(interactions)
@@ -189,13 +260,9 @@ router.put("/:id", asyncHandler(async (req: Request, res: Response) => {
       interaction_date: data.interaction_date,
       notes: data.notes,
     })
-    .where(eq(interactions.id, Number(req.params.id)))
+    .where(eq(interactions.id, interactionId))
     .returning();
 
-  if (result.length === 0) {
-    res.status(404).json({ error: "Interaction not found" });
-    return;
-  }
   res.json(result[0]);
 }));
 
@@ -218,15 +285,23 @@ router.put("/:id", asyncHandler(async (req: Request, res: Response) => {
  *         description: Interaction not found
  */
 router.delete("/:id", asyncHandler(async (req: Request, res: Response) => {
-  const result = await db
-    .delete(interactions)
-    .where(eq(interactions.id, Number(req.params.id)))
-    .returning();
+  const interactionId = Number(req.params.id);
 
-  if (result.length === 0) {
+  // Verify interaction belongs to user via application -> position -> company
+  const existingInteraction = await db
+    .select({ id: interactions.id })
+    .from(interactions)
+    .innerJoin(applications, eq(interactions.application_id, applications.id))
+    .innerJoin(positions, eq(applications.position_id, positions.id))
+    .innerJoin(companies, eq(positions.company_id, companies.id))
+    .where(and(eq(interactions.id, interactionId), eq(companies.user_id, req.userId!)));
+
+  if (existingInteraction.length === 0) {
     res.status(404).json({ error: "Interaction not found" });
     return;
   }
+
+  await db.delete(interactions).where(eq(interactions.id, interactionId));
   res.status(204).send();
 }));
 
