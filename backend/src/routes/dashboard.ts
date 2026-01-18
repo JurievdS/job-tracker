@@ -24,23 +24,34 @@ router.get("/", asyncHandler(async (req: Request, res: Response) => {
       count: count(),
     })
     .from(applications)
+    .innerJoin(positions, eq(applications.position_id, positions.id))
+    .innerJoin(companies, eq(positions.company_id, companies.id))
+    .where(eq(companies.user_id, req.userId!))
     .groupBy(applications.status);
 
   const totalCompanies = await db
     .select({ count: count() })
-    .from(companies);
+    .from(companies)
+    .where(eq(companies.user_id, req.userId!));
 
   const totalApplications = await db
     .select({ count: count() })
-    .from(applications);
+    .from(applications)
+    .innerJoin(positions, eq(applications.position_id, positions.id))
+    .innerJoin(companies, eq(positions.company_id, companies.id))
+    .where(eq(companies.user_id, req.userId!));
 
   const pendingReminders = await db
     .select({ count: count() })
     .from(reminders)
+    .innerJoin(applications, eq(reminders.application_id, applications.id))
+    .innerJoin(positions, eq(applications.position_id, positions.id))
+    .innerJoin(companies, eq(positions.company_id, companies.id))
     .where(
       and(
         eq(reminders.completed, false),
-        lte(reminders.reminder_date, sql`CURRENT_DATE`)
+        lte(reminders.reminder_date, sql`CURRENT_DATE`),
+        eq(companies.user_id, req.userId!)
       )
     );
 
@@ -55,6 +66,7 @@ router.get("/", asyncHandler(async (req: Request, res: Response) => {
     .from(applications)
     .innerJoin(positions, eq(applications.position_id, positions.id))
     .innerJoin(companies, eq(positions.company_id, companies.id))
+    .where(eq(companies.user_id, req.userId!))
     .orderBy(desc(applications.updated_at))
     .limit(5);
 
