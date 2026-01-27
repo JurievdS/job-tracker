@@ -1,0 +1,267 @@
+import { db } from "../db/index.js";
+import { companies, userCompanyNotes } from "../db/schema.js";
+import { eq, ilike, and } from "drizzle-orm";
+import { NotFoundError } from "../errors/index.js";
+import type { NewCompany, UpdateCompany } from "../schemas/companies.js";
+
+// Infer types from the schema
+type Company = typeof companies.$inferSelect;
+type UserCompanyNote = typeof userCompanyNotes.$inferSelect;
+
+// Company with user's personal notes attached
+export interface CompanyWithNotes extends Company {
+  user_notes?: string | null;
+  user_rating?: number | null;
+}
+
+/**
+ * Company Service
+ */
+export class CompanyService {
+
+  /**
+   * Get all companies (global)
+   * @return List of companies
+   */
+  async findAll(): Promise<Company[]> {
+    return db.select().from(companies);
+  }
+
+  /**
+   * Get all companies with user's personal notes attached
+   * @param userId ID of the user
+   * @return List of companies with user notes
+   */
+  async findAllWithUserNotes(userId: number): Promise<CompanyWithNotes[]> {
+    const result = await db
+      .select({
+        id: companies.id,
+        name: companies.name,
+        website: companies.website,
+        location: companies.location,
+        created_at: companies.created_at,
+        user_notes: userCompanyNotes.notes,
+        user_rating: userCompanyNotes.rating,
+      })
+      .from(companies)
+      .leftJoin(
+        userCompanyNotes,
+        and(
+          eq(userCompanyNotes.company_id, companies.id),
+          eq(userCompanyNotes.user_id, userId)
+        )
+      );
+
+    return result;
+  }
+
+  /**
+   * Search companies by name (case-insensitive, global)
+   * @param term Search term
+   * @return List of matching companies
+   */
+  async search(term: string): Promise<Company[]> {
+    return db
+      .select()
+      .from(companies)
+      .where(ilike(companies.name, `%${term}%`));
+  }
+
+  /**
+   * Get a company by ID
+   * @param companyId ID of the company
+   * @return Company
+   * @throws NotFoundError if company doesn't exist
+   */
+  async findByIdOrThrow(companyId: number): Promise<Company> {
+    const result = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.id, companyId));
+
+    if (result.length === 0) {
+      throw new NotFoundError("Company not found");
+    }
+
+    return result[0];
+  }
+
+  /**
+   * Get a company by ID with user's notes
+   * @param companyId ID of the company
+   * @param userId ID of the user
+   * @return Company with user notes
+   * @throws NotFoundError if company doesn't exist
+   */
+  async findByIdWithNotes(companyId: number, userId: number): Promise<CompanyWithNotes> {
+    const result = await db
+      .select({
+        id: companies.id,
+        name: companies.name,
+        website: companies.website,
+        location: companies.location,
+        created_at: companies.created_at,
+        user_notes: userCompanyNotes.notes,
+        user_rating: userCompanyNotes.rating,
+      })
+      .from(companies)
+      .leftJoin(
+        userCompanyNotes,
+        and(
+          eq(userCompanyNotes.company_id, companies.id),
+          eq(userCompanyNotes.user_id, userId)
+        )
+      )
+      .where(eq(companies.id, companyId));
+
+    if (result.length === 0) {
+      throw new NotFoundError("Company not found");
+    }
+
+    return result[0];
+  }
+
+  /**
+   * Get a company by ID (returns null if not found)
+   * @param companyId ID of the company
+   * @return Company or null
+   */
+  async findById(companyId: number): Promise<Company | null> {
+    const result = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.id, companyId));
+
+    return result.length > 0 ? result[0] : null;
+  }
+
+  /**
+   * Find a company by exact name (case-sensitive)
+   * @param name Name of the company
+   * @return Company or null
+   */
+  async findByName(name: string): Promise<Company | null> {
+    const result = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.name, name));
+
+    return result.length > 0 ? result[0] : null;
+  }
+
+  /**
+   * Create a new company (global)
+   * @param data New company data
+   * @return Created company
+   */
+  async create(data: NewCompany): Promise<Company> {
+    const [company] = await db
+      .insert(companies)
+      .values({
+        name: data.name,
+        website: data.website,
+        location: data.location,
+      })
+      .returning();
+
+    return company;
+  }
+
+  /**
+   * Find or create a company by name
+   */
+  async findOrCreate(name: string): Promise<Company> {
+    const existing = await this.findByName(name);
+    if (existing) {
+      return existing;
+    }
+    return this.create({ name });
+  }
+
+  // ==================== User Notes ====================
+
+  /**
+   * Get user's notes for a company
+   * @param userId ID of the user
+   * @param companyId ID of the company
+   * @return User's notes or null
+   */
+  async getUserNotes(userId: number, companyId: number): Promise<UserCompanyNote | null> {
+    const result = await db
+      .select()
+      .from(userCompanyNotes)
+      .where(
+        and(
+          eq(userCompanyNotes.user_id, userId),
+          eq(userCompanyNotes.company_id, companyId)
+        )
+      );
+
+    return result.length > 0 ? result[0] : null;
+  }
+
+  /**
+   * Set user's notes/rating for a company (upsert)
+   * @param userId ID of the user
+   * @param companyId ID of the company
+   * @param data Notes and/or rating
+   * @return Created or updated user company notes
+   */
+  async setUserNotes(
+    userId: number,
+    companyId: number,
+    data: { notes?: string; rating?: number }
+  ): Promise<UserCompanyNote> {
+    // Verify company exists
+    await this.findByIdOrThrow(companyId);
+
+    const existing = await this.getUserNotes(userId, companyId);
+
+    if (existing) {
+      // Update existing notes
+      const [updated] = await db
+        .update(userCompanyNotes)
+        .set({
+          notes: data.notes,
+          rating: data.rating,
+          updated_at: new Date(),
+        })
+        .where(eq(userCompanyNotes.id, existing.id))
+        .returning();
+
+      return updated;
+    } else {
+      // Create new notes
+      const [created] = await db
+        .insert(userCompanyNotes)
+        .values({
+          user_id: userId,
+          company_id: companyId,
+          notes: data.notes,
+          rating: data.rating,
+        })
+        .returning();
+
+      return created;
+    }
+  }
+
+  /**
+   * Delete user's notes for a company
+   * @param userId ID of the user
+   * @param companyId ID of the company
+   * @return void
+   */
+  async deleteUserNotes(userId: number, companyId: number): Promise<void> {
+    await db
+      .delete(userCompanyNotes)
+      .where(
+        and(
+          eq(userCompanyNotes.user_id, userId),
+          eq(userCompanyNotes.company_id, companyId)
+        )
+      );
+  }
+}
+
+export const companyService = new CompanyService();
