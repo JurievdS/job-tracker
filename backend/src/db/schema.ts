@@ -22,6 +22,7 @@ export const refreshTokens = pgTable("refresh_tokens", {
 
 export const applications = pgTable("applications", {
   id: serial("id").primaryKey(),
+  user_id: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
   position_id: integer("position_id").references(() => positions.id, { onDelete: "cascade" }),
   status: varchar("status", { length: 50 }).default("bookmarked"),
   date_applied: date("date_applied"),
@@ -32,17 +33,25 @@ export const applications = pgTable("applications", {
 
 export const companies = pgTable("companies", {
   id: serial("id").primaryKey(),
-  user_id: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
   website: varchar("website", { length: 255 }),
   location: varchar("location", { length: 255 }),
+  created_at: timestamp("created_at").defaultNow(),
+});
+
+export const userCompanyNotes = pgTable("user_company_notes", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  company_id: integer("company_id").references(() => companies.id, { onDelete: "cascade" }).notNull(),
   notes: text("notes"),
   rating: integer("rating"),
   created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
 });
 
 export const contacts = pgTable("contacts", {
   id: serial("id").primaryKey(),
+  user_id: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
   company_id: integer("company_id").references(() => companies.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   role: varchar("role", { length: 255 }),

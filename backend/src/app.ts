@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./swagger.js";
 import router from "./routes/index.js";
@@ -8,6 +9,15 @@ import { authenticate } from "./middleware/auth.js";
 import passport from "./config/passport.js";
 
 const app = express();
+
+// CORS configuration for frontend
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 app.use(passport.initialize());
 

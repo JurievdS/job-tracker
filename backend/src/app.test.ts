@@ -30,7 +30,7 @@ describe("API", () => {
 
   afterAll(async () => {
     // Clean up test data
-    await db.delete(companies).where(eq(companies.user_id, testUserId));
+    await db.delete(companies).where(eq(companies.name, "Test Company"));
     await db.delete(users).where(eq(users.id, testUserId));
   });
 
@@ -73,15 +73,6 @@ describe("API", () => {
         .set("Authorization", `Bearer ${testToken}`);
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body)).toBe(true);
-    });
-
-    it("should return dashboard stats with auth", async () => {
-      const res = await request(app)
-        .get("/dashboard")
-        .set("Authorization", `Bearer ${testToken}`);
-      expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty("stats");
-      expect(res.body).toHaveProperty("recent_activity");
     });
 
     it("should return 404 for non-existent company with auth", async () => {

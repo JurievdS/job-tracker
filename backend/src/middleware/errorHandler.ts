@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction, RequestHandler } from "express";
 import { ZodError } from "zod";
+import { AppError, ValidationError } from "../errors/index.js";
 
 type asyncRequestHandler = (
   req: Request,
@@ -13,6 +14,21 @@ function errorHandler(
   res: Response,
   next: NextFunction,
 ) {
+  // Handle application-specific errors
+  if (err instanceof AppError) {
+    const response: { error: string; errors?: Record<string, string[]> } = {
+      error: err.message,
+    };
+
+    // Include validation errors if present
+    if (err instanceof ValidationError && err.errors) {
+      response.errors = err.errors;
+    }
+
+    res.status(err.statusCode).json(response);
+    return;
+  }
+
   // Handle Zod validation errors
   if (err instanceof ZodError) {
     res.status(400).json({
@@ -22,10 +38,10 @@ function errorHandler(
     return;
   }
 
-  // log the error to console
+  // Log unexpected errors
   console.error(err.message, err.stack);
 
-  // send generic error response
+  // Send generic error response for unexpected errors
   if (process.env.NODE_ENV !== "production") {
     res.status(500).json({ error: err.message, stack: err.stack });
   } else {

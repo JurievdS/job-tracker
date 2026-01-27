@@ -15,6 +15,20 @@
       "when": 1768729274988,
       "tag": "0001_lying_tyger_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769476526503,
+      "tag": "0002_sparkling_nemesis",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1769476819329,
+      "tag": "0003_flimsy_the_stranger",
+      "breakpoints": true
     }
   ]
 }

@@ -1,11 +1,13 @@
-import { Router, Request, Response } from "express";
+import { Router } from "express";
 import { asyncHandler } from "../middleware/errorHandler.js";
-import { db } from "../db/index.js";
-import { companies } from "../db/schema.js";
-import { eq, and } from "drizzle-orm";
-import { CompanySchema, UpdateCompanySchema } from "../schemas/companies.js";
+import { CompanyController } from "../controllers/CompanyController.js";
+import { CompanyService } from "../services/CompanyService.js";
 
 const router = Router();
+
+// Initialize controller with service
+const companyService = new CompanyService();
+const controller = new CompanyController(companyService);
 
 /**
  * @swagger
@@ -22,6 +24,25 @@ const router = Router();
  *           type: string
  *         location:
  *           type: string
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *     CompanyWithNotes:
+ *       allOf:
+ *         - $ref: '#/components/schemas/Company'
+ *         - type: object
+ *           properties:
+ *             user_notes:
+ *               type: string
+ *               nullable: true
+ *             user_rating:
+ *               type: integer
+ *               minimum: 1
+ *               maximum: 5
+ *               nullable: true
+ *     UserCompanyNotes:
+ *       type: object
+ *       properties:
  *         notes:
  *           type: string
  *         rating:
@@ -35,24 +56,38 @@ const router = Router();
  * /companies:
  *   get:
  *     summary: Get all companies
+ *     description: Returns all companies. If authenticated, includes user's personal notes.
  *     tags: [Companies]
  *     responses:
  *       200:
  *         description: List of companies
  */
-router.get(
-  "/",
-  asyncHandler(async (req: Request, res: Response) => {
-    const result = await db.select().from(companies).where(eq(companies.user_id, req.userId!));
-    res.json(result);
-  }),
-);
+router.get("/", asyncHandler(controller.list));
+
+/**
+ * @swagger
+ * /companies/search:
+ *   get:
+ *     summary: Search companies by name
+ *     tags: [Companies]
+ *     parameters:
+ *       - in: query
+ *         name: term
+ *         schema:
+ *           type: string
+ *         description: Search term
+ *     responses:
+ *       200:
+ *         description: List of matching companies
+ */
+router.get("/search", asyncHandler(controller.search));
 
 /**
  * @swagger
  * /companies/{id}:
  *   get:
  *     summary: Get a company by ID
+ *     description: Returns a company. If authenticated, includes user's personal notes.
  *     tags: [Companies]
  *     parameters:
  *       - in: path
@@ -66,63 +101,59 @@ router.get(
  *       404:
  *         description: Company not found
  */
-router.get(
-  "/:id",
-  asyncHandler(async (req: Request, res: Response) => {
-    const id = Number(req.params.id);
-    const result = await db
-      .select()
-      .from(companies)
-      .where(and(eq(companies.id, id), eq(companies.user_id, req.userId!)));
-    if (result.length === 0) {
-      res.status(404).json({ error: "Company not found" });
-      return;
-    }
-    res.json(result[0]);
-  }),
-);
+router.get("/:id", asyncHandler(controller.getById));
 
 /**
  * @swagger
  * /companies:
  *   post:
  *     summary: Create a company
+ *     description: Creates a new global company. Companies are shared across all users.
  *     tags: [Companies]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Company'
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *               website:
+ *                 type: string
+ *               location:
+ *                 type: string
  *     responses:
  *       201:
  *         description: Company created
  */
-router.post(
-  "/",
-  asyncHandler(async (req: Request, res: Response) => {
-    const data = CompanySchema.parse(req.body);
-
-    const result = await db
-      .insert(companies)
-      .values({
-        user_id: req.userId!,
-        name: data.name,
-        website: data.website,
-        location: data.location,
-        notes: data.notes,
-        rating: data.rating,
-      })
-      .returning();
-    res.status(201).json(result[0]);
-  }),
-);
+router.post("/", asyncHandler(controller.create));
 
 /**
  * @swagger
- * /companies/{id}:
+ * /companies/{id}/notes:
+ *   get:
+ *     summary: Get user's notes for a company
+ *     tags: [Companies]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: User's notes for the company
+ */
+router.get("/:id/notes", asyncHandler(controller.getUserNotes));
+
+/**
+ * @swagger
+ * /companies/{id}/notes:
  *   put:
- *     summary: Update a company
+ *     summary: Set user's notes for a company
  *     tags: [Companies]
  *     parameters:
  *       - in: path
@@ -135,44 +166,20 @@ router.post(
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Company'
+ *             $ref: '#/components/schemas/UserCompanyNotes'
  *     responses:
  *       200:
- *         description: Company updated
+ *         description: Notes updated
  *       404:
  *         description: Company not found
  */
-router.put(
-  "/:id",
-  asyncHandler(async (req: Request, res: Response) => {
-    const id = Number(req.params.id);
-    const data = UpdateCompanySchema.parse(req.body);
-
-    const result = await db
-      .update(companies)
-      .set({
-        name: data.name,
-        website: data.website,
-        location: data.location,
-        notes: data.notes,
-        rating: data.rating,
-      })
-      .where(and(eq(companies.id, id), eq(companies.user_id, req.userId!)))
-      .returning();
-
-    if (result.length === 0) {
-      res.status(404).json({ error: "Company not found" });
-      return;
-    }
-    res.json(result[0]);
-  }),
-);
+router.put("/:id/notes", asyncHandler(controller.setUserNotes));
 
 /**
  * @swagger
- * /companies/{id}:
+ * /companies/{id}/notes:
  *   delete:
- *     summary: Delete a company
+ *     summary: Delete user's notes for a company
  *     tags: [Companies]
  *     parameters:
  *       - in: path
@@ -182,25 +189,8 @@ router.put(
  *           type: integer
  *     responses:
  *       204:
- *         description: Company deleted
- *       404:
- *         description: Company not found
+ *         description: Notes deleted
  */
-router.delete(
-  "/:id",
-  asyncHandler(async (req: Request, res: Response) => {
-    const id = Number(req.params.id);
-    const result = await db
-      .delete(companies)
-      .where(and(eq(companies.id, id), eq(companies.user_id, req.userId!)))
-      .returning();
-
-    if (result.length === 0) {
-      res.status(404).json({ error: "Company not found" });
-      return;
-    }
-    res.status(204).send();
-  }),
-);
+router.delete("/:id/notes", asyncHandler(controller.deleteUserNotes));
 
 export default router;
