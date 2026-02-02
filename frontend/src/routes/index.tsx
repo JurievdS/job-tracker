@@ -13,6 +13,7 @@ import { RegisterPage } from '@/pages/auth/RegisterPage';
 import { OAuthCallbackPage } from '@/pages/auth/OAuthCallbackPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
 import { ApplicationsPage } from '@/pages/applications/ApplicationsPage';
+import { CompaniesPage } from '@/pages/companies/CompaniesPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 /**
@@ -71,6 +72,10 @@ const router = createBrowserRouter([
             path: ROUTES.APPLICATIONS,
             element: <ApplicationsPage />,
           },
+          {
+            path: ROUTES.COMPANIES,
+            element: <CompaniesPage />,
+          }
         ],
       },
     ],

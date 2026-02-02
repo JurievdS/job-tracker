@@ -10,3 +10,4 @@ export { DateInput } from './DateInput';
 export { Autocomplete, type AutocompleteOption } from './Autocomplete';
 export { LoadingSpinner } from './LoadingSpinner';
 export { Form } from './Form';
+export { Skeleton,SkeletonText } from './Skeleton';
