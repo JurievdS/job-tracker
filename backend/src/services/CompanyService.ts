@@ -1,8 +1,9 @@
 import { db } from "../db/index.js";
 import { companies, userCompanyNotes } from "../db/schema.js";
 import { eq, ilike, and } from "drizzle-orm";
-import { NotFoundError } from "../errors/index.js";
+import { NotFoundError, ConflictError } from "../errors/index.js";
 import type { NewCompany, UpdateCompany } from "../schemas/companies.js";
+import { normalizeCompanyName } from "../utils/companyNormalization.js";
 
 // Infer types from the schema
 type Company = typeof companies.$inferSelect;
@@ -37,6 +38,7 @@ export class CompanyService {
       .select({
         id: companies.id,
         name: companies.name,
+        normalized_name: companies.normalized_name,
         website: companies.website,
         location: companies.location,
         created_at: companies.created_at,
@@ -98,6 +100,7 @@ export class CompanyService {
       .select({
         id: companies.id,
         name: companies.name,
+        normalized_name: companies.normalized_name,
         website: companies.website,
         location: companies.location,
         created_at: companies.created_at,
@@ -150,15 +153,41 @@ export class CompanyService {
   }
 
   /**
+   * Find a company by normalized name
+   * @param normalizedName Normalized name to search for
+   * @return Company or null
+   */
+  async findByNormalizedName(normalizedName: string): Promise<Company | null> {
+    const result = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.normalized_name, normalizedName));
+
+    return result.length > 0 ? result[0] : null;
+  }
+
+  /**
    * Create a new company (global)
    * @param data New company data
    * @return Created company
+   * @throws ConflictError if a similar company already exists
    */
   async create(data: NewCompany): Promise<Company> {
+    const normalizedName = normalizeCompanyName(data.name);
+
+    // Check for existing company with same normalized name
+    const existing = await this.findByNormalizedName(normalizedName);
+    if (existing) {
+      throw new ConflictError(
+        `A similar company already exists: "${existing.name}". Use the existing company or provide a more distinct name.`
+      );
+    }
+
     const [company] = await db
       .insert(companies)
       .values({
         name: data.name,
+        normalized_name: normalizedName,
         website: data.website,
         location: data.location,
       })
@@ -168,13 +197,19 @@ export class CompanyService {
   }
 
   /**
-   * Find or create a company by name
+   * Find or create a company by name (uses normalized matching)
+   * Returns existing company if normalized name matches
    */
   async findOrCreate(name: string): Promise<Company> {
-    const existing = await this.findByName(name);
+    const normalizedName = normalizeCompanyName(name);
+
+    // First try to find by normalized name
+    const existing = await this.findByNormalizedName(normalizedName);
     if (existing) {
       return existing;
     }
+
+    // Create new company (this will also set normalized_name)
     return this.create({ name });
   }
 

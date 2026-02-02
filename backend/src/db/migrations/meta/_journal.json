@@ -29,6 +29,13 @@
       "when": 1769476819329,
       "tag": "0003_flimsy_the_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1770060853318,
+      "tag": "0004_old_paibok",
+      "breakpoints": true
     }
   ]
 }
