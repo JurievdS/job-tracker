@@ -33,7 +33,8 @@ export const applications = pgTable("applications", {
 
 export const companies = pgTable("companies", {
   id: serial("id").primaryKey(),
-  name: varchar("name", { length: 255 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  normalized_name: varchar("normalized_name", { length: 255 }).unique(),
   website: varchar("website", { length: 255 }),
   location: varchar("location", { length: 255 }),
   created_at: timestamp("created_at").defaultNow(),

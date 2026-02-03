@@ -62,7 +62,7 @@ export function KanbanBoard({
     );
   }
 
-  if (applications.length === 0 && !isLoading) {
+  if (applications.length === 0) {
     return (
       <EmptyState
         title="No applications yet"
