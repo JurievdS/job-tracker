@@ -12,6 +12,7 @@ import { LoginPage, RegisterPage, OAuthCallbackPage } from '@/pages/auth';
 import { DashboardPage } from '@/pages/dashboard';
 import { ApplicationsPage } from '@/pages/applications';
 import { CompaniesPage } from '@/pages/companies';
+import { ContactsPage } from '@/pages/contacts';
 import { PositionsPage } from '@/pages/positions';
 import { InteractionsPage } from '@/pages/interactions';
 import { RemindersPage } from '@/pages/reminders';
@@ -76,6 +77,10 @@ const router = createBrowserRouter([
           {
             path: ROUTES.COMPANIES,
             element: <CompaniesPage />,
+          },
+          {
+            path: ROUTES.CONTACTS,
+            element: <ContactsPage />,
           },
           {
             path: ROUTES.POSITIONS,
