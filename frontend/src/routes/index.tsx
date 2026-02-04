@@ -13,6 +13,7 @@ import { DashboardPage } from '@/pages/dashboard';
 import { ApplicationsPage } from '@/pages/applications';
 import { CompaniesPage } from '@/pages/companies';
 import { PositionsPage } from '@/pages/positions';
+import { InteractionsPage } from '@/pages/interactions';
 import { RemindersPage } from '@/pages/reminders';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
@@ -79,6 +80,10 @@ const router = createBrowserRouter([
           {
             path: ROUTES.POSITIONS,
             element: <PositionsPage />,
+          },
+          {
+            path: ROUTES.INTERACTIONS,
+            element: <InteractionsPage />,
           },
           {
             path: ROUTES.REMINDERS,

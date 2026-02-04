@@ -16,6 +16,7 @@ export const ROUTES = {
   COMPANY_DETAIL: '/companies/:id',
   CONTACTS: '/contacts',
   POSITIONS: '/positions',
+  INTERACTIONS: '/interactions',
   REMINDERS: '/reminders',
   SETTINGS: '/settings',
 } as const;
