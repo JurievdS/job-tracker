@@ -1,23 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
 
-export interface AutocompleteOption {
+export interface ComboBoxOption {
   value: string;
   label: string;
 }
 
-interface AutocompleteProps {
+interface ComboBoxProps {
   /** Label text */
   label?: string;
   /** Error message */
   error?: string;
   /** Currently selected option */
-  value: AutocompleteOption | null;
+  value: ComboBoxOption | null;
   /** Called when an option is selected */
-  onChange: (option: AutocompleteOption | null) => void;
+  onChange: (option: ComboBoxOption | null) => void;
   /** Called when user types - use this to fetch/filter options */
   onSearch: (term: string) => void;
   /** Available options to display */
-  options: AutocompleteOption[];
+  options: ComboBoxOption[];
   /** Show loading indicator */
   loading?: boolean;
   /** Placeholder text */
@@ -31,15 +31,15 @@ interface AutocompleteProps {
 }
 
 /**
- * Autocomplete - A searchable dropdown with async option loading
+ * ComboBox - A searchable dropdown with async option loading
  *
  * Unlike a native <select>, this allows typing to filter/search options.
  * Use this for cases where you need to search a backend API as the user types.
  *
  * Usage:
  * ```tsx
- * const [company, setCompany] = useState<AutocompleteOption | null>(null);
- * const [companies, setCompanies] = useState<AutocompleteOption[]>([]);
+ * const [company, setCompany] = useState<ComboBoxOption | null>(null);
+ * const [companies, setCompanies] = useState<ComboBoxOption[]>([]);
  * const [loading, setLoading] = useState(false);
  *
  * const handleSearch = async (term: string) => {
@@ -49,7 +49,7 @@ interface AutocompleteProps {
  *   setLoading(false);
  * };
  *
- * <Autocomplete
+ * <ComboBox
  *   label="Company"
  *   value={company}
  *   onChange={setCompany}
@@ -62,7 +62,7 @@ interface AutocompleteProps {
  * />
  * ```
  */
-export function Autocomplete({
+export function ComboBox({
   label,
   error,
   value,
@@ -74,7 +74,7 @@ export function Autocomplete({
   allowCreate = false,
   onCreateNew,
   disabled = false,
-}: AutocompleteProps) {
+}: ComboBoxProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value?.label || '');
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -111,7 +111,7 @@ export function Autocomplete({
     onSearch(newValue);
   };
 
-  const handleSelect = (option: AutocompleteOption) => {
+  const handleSelect = (option: ComboBoxOption) => {
     onChange(option);
     setInputValue(option.label);
     setIsOpen(false);

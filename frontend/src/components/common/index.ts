@@ -7,7 +7,7 @@ export { Calendar } from './Calendar';
 export { EmptyState } from './EmptyState';
 export { Input, Textarea, Select } from './Input';
 export { DateInput } from './DateInput';
-export { Autocomplete, type AutocompleteOption } from './Autocomplete';
+export { ComboBox, type ComboBoxOption } from './ComboBox';
 export { LoadingSpinner } from './LoadingSpinner';
 export { Form } from './Form';
 export { Skeleton,SkeletonText } from './Skeleton';

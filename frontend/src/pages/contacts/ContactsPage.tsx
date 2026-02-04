@@ -3,7 +3,7 @@ import type { Contact, CreateContactDto, UpdateContactDto } from '@/types/contac
 import type { Company } from '@/types/company';
 import { contactsApi } from '@/api/contacts';
 import { companiesApi } from '@/api/companies';
-import { Button, Input, Textarea, Select, Modal, Form, Table, Autocomplete, type AutocompleteOption } from '@/components/common';
+import { Button, Input, Textarea, Select, Modal, Form, Table, ComboBox, type ComboBoxOption } from '@/components/common';
 
 export function ContactsPage() {
   // Data state
@@ -23,8 +23,8 @@ export function ContactsPage() {
 
   // Form state
   const [formName, setFormName] = useState('');
-  const [formCompany, setFormCompany] = useState<AutocompleteOption | null>(null);
-  const [companySearchResults, setCompanySearchResults] = useState<AutocompleteOption[]>([]);
+  const [formCompany, setFormCompany] = useState<ComboBoxOption | null>(null);
+  const [companySearchResults, setCompanySearchResults] = useState<ComboBoxOption[]>([]);
   const [formRole, setFormRole] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formLinkedin, setFormLinkedin] = useState('');
@@ -354,7 +354,7 @@ export function ContactsPage() {
               required
             />
 
-            <Autocomplete
+            <ComboBox
               label="Company"
               value={formCompany}
               onChange={setFormCompany}

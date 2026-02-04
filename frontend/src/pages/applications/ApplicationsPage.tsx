@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { applicationsApi } from '@/api/applications';
 import { companiesApi } from '@/api/companies';
 import {
-  Table, Button, EmptyState, Select, Modal, Form, Input, Textarea, Autocomplete, DateInput, type AutocompleteOption
+  Table, Button, EmptyState, Select, Modal, Form, Input, Textarea, ComboBox, DateInput, type ComboBoxOption
 } from '@/components/common';
 import { today } from '@/utils/date';
 import { StatusBadge } from '@/components/common/Badge';
@@ -26,8 +26,8 @@ export function ApplicationsPage() {
   const [dateApplied, setDateApplied] = useState(today());
   const [status, setStatus] = useState<ApplicationStatus>('bookmarked');
   const [notes, setNotes] = useState('');
-  const [company, setCompany] = useState<AutocompleteOption | null>(null);
-  const [companies, setCompanies] = useState<AutocompleteOption[]>([]);
+  const [company, setCompany] = useState<ComboBoxOption | null>(null);
+  const [companies, setCompanies] = useState<ComboBoxOption[]>([]);
 
   // View mode and detail modal state
   const [viewMode, setViewMode] = useState<ViewMode>('table');
@@ -264,7 +264,7 @@ export function ApplicationsPage() {
         isOpen={isModalOpen} >
           <Form title="New Application" onSubmit={handleSubmit}>
             <div className="space-y-4">
-              <Autocomplete
+              <ComboBox
                 label="Company"
                 value={company}
                 onChange={setCompany}
