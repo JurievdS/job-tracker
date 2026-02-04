@@ -8,13 +8,13 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 
 // Pages
-import { LoginPage } from '@/pages/auth/LoginPage';
-import { RegisterPage } from '@/pages/auth/RegisterPage';
-import { OAuthCallbackPage } from '@/pages/auth/OAuthCallbackPage';
-import { DashboardPage } from '@/pages/dashboard/DashboardPage';
-import { ApplicationsPage } from '@/pages/applications/ApplicationsPage';
-import { CompaniesPage } from '@/pages/companies/CompaniesPage';
-import { PositionsPage } from '@/pages/positions/PositionsPage';
+import { LoginPage, RegisterPage, OAuthCallbackPage } from '@/pages/auth';
+import { DashboardPage } from '@/pages/dashboard';
+import { ApplicationsPage } from '@/pages/applications';
+import { CompaniesPage } from '@/pages/companies';
+import { PositionsPage } from '@/pages/positions';
+import { InteractionsPage } from '@/pages/interactions';
+import { RemindersPage } from '@/pages/reminders';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 /**
@@ -80,6 +80,14 @@ const router = createBrowserRouter([
           {
             path: ROUTES.POSITIONS,
             element: <PositionsPage />,
+          },
+          {
+            path: ROUTES.INTERACTIONS,
+            element: <InteractionsPage />,
+          },
+          {
+            path: ROUTES.REMINDERS,
+            element: <RemindersPage />,
           }
         ],
       },

@@ -11,6 +11,7 @@ export function MainLayout() {
     { path: ROUTES.COMPANIES, label: 'Companies', icon: '🏢' },
     { path: ROUTES.CONTACTS, label: 'Contacts', icon: '👥' },
     { path: ROUTES.POSITIONS, label: 'Positions', icon: '💼' },
+    { path: ROUTES.INTERACTIONS, label: 'Interactions', icon: '💬' },
     { path: ROUTES.REMINDERS, label: 'Reminders', icon: '⏰' },
   ];
 
