@@ -1,34 +1,38 @@
 import { db } from "../db/index.js";
-import { applications, positions, companies } from "../db/schema.js";
-import { eq, desc, and, count } from "drizzle-orm";
+import { applications, companies, statusHistory, tags, applicationTags, documents, applicationDocuments } from "../db/schema.js";
+import { eq, desc, and, count, inArray, sql } from "drizzle-orm";
 import { NotFoundError } from "../errors/index.js";
 import { CompanyService } from "./CompanyService.js";
-import { PositionService } from "./PositionService.js";
-import type { NewApplication, UpdateApplication } from "../schemas/applications.js";
+import type { NewApplication, UpdateApplication, QuickCreateApplication } from "../schemas/applications.js";
 
 // Infer types from the schema
 type Application = typeof applications.$inferSelect;
 
-// Application with joined position/company details
+// Application with joined company details
 export interface ApplicationWithDetails {
   id: number;
-  position_id: number | null;
+  company_id: number | null;
+  job_title: string;
+  job_url: string | null;
+  job_description: string | null;
+  requirements: string | null;
+  location: string | null;
+  remote_type: string | null;
+  salary_advertised_min: number | null;
+  salary_advertised_max: number | null;
+  salary_offered: number | null;
+  salary_currency: string | null;
+  salary_period: string | null;
   status: string | null;
+  source: string;
+  source_url: string | null;
   date_applied: string | null;
+  date_responded: string | null;
   notes: string | null;
   created_at: Date | null;
   updated_at: Date | null;
-  position_title: string;
-  company_name: string;
-}
-
-// Input type for quick-create
-export interface QuickCreateInput {
-  company_name: string;
-  position_title: string;
-  status: "bookmarked" | "applied" | "phone_screen" | "technical" | "final_round" | "offer" | "rejected";
-  date_applied?: string;
-  notes?: string;
+  company_name: string | null;
+  tags?: { id: number; name: string; color: string | null }[];
 }
 
 /**
@@ -36,48 +40,52 @@ export interface QuickCreateInput {
  */
 export class ApplicationService {
   constructor(
-    private companyService: CompanyService = new CompanyService(),
-    private positionService: PositionService = new PositionService()
+    private companyService: CompanyService = new CompanyService()
   ) {}
 
   /**
    * Get all applications for a user (with optional status filter)
-   * @param status Optional status to filter by
-   * @return List of applications with joined details
    */
   async findAll(userId: number, status?: string): Promise<ApplicationWithDetails[]> {
     const baseQuery = db
       .select({
         id: applications.id,
-        position_id: applications.position_id,
+        company_id: applications.company_id,
+        job_title: applications.job_title,
+        job_url: applications.job_url,
+        job_description: applications.job_description,
+        requirements: applications.requirements,
+        location: applications.location,
+        remote_type: applications.remote_type,
+        salary_advertised_min: applications.salary_advertised_min,
+        salary_advertised_max: applications.salary_advertised_max,
+        salary_offered: applications.salary_offered,
+        salary_currency: applications.salary_currency,
+        salary_period: applications.salary_period,
         status: applications.status,
+        source: applications.source,
+        source_url: applications.source_url,
         date_applied: applications.date_applied,
+        date_responded: applications.date_responded,
         notes: applications.notes,
         created_at: applications.created_at,
         updated_at: applications.updated_at,
-        position_title: positions.title,
         company_name: companies.name,
       })
       .from(applications)
-      .innerJoin(positions, eq(applications.position_id, positions.id))
-      .innerJoin(companies, eq(positions.company_id, companies.id))
+      .leftJoin(companies, eq(applications.company_id, companies.id))
       .orderBy(desc(applications.updated_at));
 
+    const conditions = [eq(applications.user_id, userId)];
     if (status) {
-      return baseQuery.where(
-        and(eq(applications.status, status), eq(applications.user_id, userId))
-      );
+      conditions.push(eq(applications.status, status));
     }
 
-    return baseQuery.where(eq(applications.user_id, userId));
+    return baseQuery.where(and(...conditions));
   }
 
   /**
    * Get a single application by ID with joined details
-   * @param applicationId ID of the application
-   * @param userId ID of the user
-   * @return Application with position and company details
-   * @throws NotFoundError if not found or doesn't belong to user
    */
   async findByIdWithDetails(
     applicationId: number,
@@ -86,18 +94,30 @@ export class ApplicationService {
     const result = await db
       .select({
         id: applications.id,
-        position_id: applications.position_id,
+        company_id: applications.company_id,
+        job_title: applications.job_title,
+        job_url: applications.job_url,
+        job_description: applications.job_description,
+        requirements: applications.requirements,
+        location: applications.location,
+        remote_type: applications.remote_type,
+        salary_advertised_min: applications.salary_advertised_min,
+        salary_advertised_max: applications.salary_advertised_max,
+        salary_offered: applications.salary_offered,
+        salary_currency: applications.salary_currency,
+        salary_period: applications.salary_period,
         status: applications.status,
+        source: applications.source,
+        source_url: applications.source_url,
         date_applied: applications.date_applied,
+        date_responded: applications.date_responded,
         notes: applications.notes,
         created_at: applications.created_at,
         updated_at: applications.updated_at,
-        position_title: positions.title,
         company_name: companies.name,
       })
       .from(applications)
-      .innerJoin(positions, eq(applications.position_id, positions.id))
-      .innerJoin(companies, eq(positions.company_id, companies.id))
+      .leftJoin(companies, eq(applications.company_id, companies.id))
       .where(
         and(eq(applications.id, applicationId), eq(applications.user_id, userId))
       );
@@ -106,15 +126,22 @@ export class ApplicationService {
       throw new NotFoundError("Application not found");
     }
 
-    return result[0];
+    // Get tags for this application
+    const appTags = await db
+      .select({
+        id: tags.id,
+        name: tags.name,
+        color: tags.color,
+      })
+      .from(applicationTags)
+      .innerJoin(tags, eq(applicationTags.tag_id, tags.id))
+      .where(eq(applicationTags.application_id, applicationId));
+
+    return { ...result[0], tags: appTags };
   }
 
   /**
    * Get a single application by ID (basic, no joins)
-   * @param applicationId ID of the application
-   * @param userId ID of the user
-   * @return Application
-   * @throws NotFoundError if not found or doesn't belong to user
    */
   async findByIdOrThrow(applicationId: number, userId: number): Promise<Application> {
     const result = await db
@@ -133,8 +160,6 @@ export class ApplicationService {
 
   /**
    * Get application counts grouped by status
-   * @param userId ID of the user
-   * @return Record mapping status to count
    */
   async getStatusCounts(userId: number): Promise<Record<string, number>> {
     const results = await db
@@ -157,90 +182,130 @@ export class ApplicationService {
   }
 
   /**
+   * Get metrics by source
+   */
+  async getSourceMetrics(userId: number) {
+    const results = await db
+      .select({
+        source: applications.source,
+        total: count(applications.id),
+        applied: sql<number>`COUNT(*) FILTER (WHERE ${applications.status} != 'bookmarked')`,
+        responded: sql<number>`COUNT(*) FILTER (WHERE ${applications.date_responded} IS NOT NULL)`,
+        interviews: sql<number>`COUNT(*) FILTER (WHERE ${applications.status} = 'phone_screen' OR ${applications.status} = 'technical' OR ${applications.status} = 'final_round')`,
+        offers: sql<number>`COUNT(*) FILTER (WHERE ${applications.status} = 'offer')`,
+      })
+      .from(applications)
+      .where(eq(applications.user_id, userId))
+      .groupBy(applications.source);
+
+    return results;
+  }
+
+  /**
    * Create a new application
-   * @param userId ID of the user
-   * @param data Application data
-   * @return Created application
-   * @throws NotFoundError if position doesn't exist
    */
   async create(userId: number, data: NewApplication): Promise<Application> {
-    // Verify position exists
-    await this.positionService.findByIdOrThrow(data.position_id);
+    let companyId = data.company_id;
+
+    // If company_name is provided but not company_id, find or create the company
+    if (data.company_name && !companyId) {
+      const company = await this.companyService.findOrCreate(data.company_name);
+      companyId = company.id;
+    }
 
     const [application] = await db
       .insert(applications)
       .values({
         user_id: userId,
-        position_id: data.position_id,
+        company_id: companyId,
+        job_title: data.job_title,
+        job_url: data.job_url === "" ? null : data.job_url,
+        job_description: data.job_description,
+        requirements: data.requirements,
+        location: data.location,
+        remote_type: data.remote_type,
+        salary_advertised_min: data.salary_advertised_min,
+        salary_advertised_max: data.salary_advertised_max,
+        salary_currency: data.salary_currency,
+        salary_period: data.salary_period,
         status: data.status,
+        source: data.source,
+        source_url: data.source_url === "" ? null : data.source_url,
         date_applied: data.date_applied,
         notes: data.notes,
       })
       .returning();
+
+    // Record initial status in history
+    await db.insert(statusHistory).values({
+      application_id: application.id,
+      from_status: null,
+      to_status: application.status || "bookmarked",
+    });
 
     return application;
   }
 
   /**
-   * Quick create - finds/creates company and position, then creates application
-   * @param userId ID of the user
-   * @param data Quick create application data
-   * @return Application with position and company details
+   * Quick create - finds/creates company, then creates application
    */
   async quickCreate(
     userId: number,
-    data: QuickCreateInput
+    data: QuickCreateApplication
   ): Promise<ApplicationWithDetails> {
-    // 1. Find or create company (global)
+    // Find or create company
     const company = await this.companyService.findOrCreate(data.company_name);
 
-    // 2. Find or create position (global, tied to company)
-    const position = await this.positionService.findOrCreate(
-      company.id,
-      data.position_title
-    );
-
-    // 3. Create application (user-specific)
+    // Create application
     const [newApplication] = await db
       .insert(applications)
       .values({
         user_id: userId,
-        position_id: position.id,
+        company_id: company.id,
+        job_title: data.job_title,
+        source: data.source,
         status: data.status,
+        job_url: data.job_url === "" ? null : data.job_url,
         date_applied: data.date_applied,
         notes: data.notes,
       })
       .returning();
 
-    // 4. Return with joined data
+    // Record initial status in history
+    await db.insert(statusHistory).values({
+      application_id: newApplication.id,
+      from_status: null,
+      to_status: newApplication.status || "bookmarked",
+    });
+
     return this.findByIdWithDetails(newApplication.id, userId);
   }
 
   /**
    * Update an application
-   * @param applicationId ID of the application
-   * @param userId ID of the user
-   * @param data Update data
-   * @return Updated application
-   * @throws NotFoundError if not found or doesn't belong to user
    */
   async update(
     applicationId: number,
     userId: number,
     data: UpdateApplication
   ): Promise<Application> {
-    // Verify application exists and belongs to user
-    await this.findByIdOrThrow(applicationId, userId);
+    const existing = await this.findByIdOrThrow(applicationId, userId);
 
-    // If updating position_id, verify position exists
-    if (data.position_id) {
-      await this.positionService.findByIdOrThrow(data.position_id);
+    // Track status change if status is being updated
+    if (data.status && data.status !== existing.status) {
+      await db.insert(statusHistory).values({
+        application_id: applicationId,
+        from_status: existing.status,
+        to_status: data.status,
+      });
     }
 
     const [updated] = await db
       .update(applications)
       .set({
         ...data,
+        job_url: data.job_url === "" ? null : data.job_url,
+        source_url: data.source_url === "" ? null : data.source_url,
         updated_at: new Date(),
       })
       .where(eq(applications.id, applicationId))
@@ -251,19 +316,20 @@ export class ApplicationService {
 
   /**
    * Update only the status of an application
-   * @param applicationId ID of the application
-   * @param userId ID of the user
-   * @param status New status
-   * @return Updated application
-   * @throws NotFoundError if not found or doesn't belong to user
    */
   async updateStatus(
     applicationId: number,
     userId: number,
     status: string
   ): Promise<Application> {
-    // Verify application exists and belongs to user
-    await this.findByIdOrThrow(applicationId, userId);
+    const existing = await this.findByIdOrThrow(applicationId, userId);
+
+    // Record status change
+    await db.insert(statusHistory).values({
+      application_id: applicationId,
+      from_status: existing.status,
+      to_status: status,
+    });
 
     const [updated] = await db
       .update(applications)
@@ -279,16 +345,183 @@ export class ApplicationService {
 
   /**
    * Delete an application
-   * @param applicationId ID of the application
-   * @param userId ID of the user
-   * @return void
-   * @throws NotFoundError if not found or doesn't belong to user
    */
   async delete(applicationId: number, userId: number): Promise<void> {
-    // Verify application exists and belongs to user
+    await this.findByIdOrThrow(applicationId, userId);
+    await db.delete(applications).where(eq(applications.id, applicationId));
+  }
+
+  /**
+   * Get status history for an application
+   */
+  async getStatusHistory(applicationId: number, userId: number) {
     await this.findByIdOrThrow(applicationId, userId);
 
-    await db.delete(applications).where(eq(applications.id, applicationId));
+    return db
+      .select()
+      .from(statusHistory)
+      .where(eq(statusHistory.application_id, applicationId))
+      .orderBy(desc(statusHistory.changed_at));
+  }
+
+  /**
+   * Add tags to an application
+   */
+  async addTags(applicationId: number, userId: number, tagIds: number[]): Promise<void> {
+    await this.findByIdOrThrow(applicationId, userId);
+
+    // Verify all tags belong to the user
+    const userTags = await db
+      .select()
+      .from(tags)
+      .where(and(inArray(tags.id, tagIds), eq(tags.user_id, userId)));
+
+    if (userTags.length !== tagIds.length) {
+      throw new NotFoundError("One or more tags not found");
+    }
+
+    // Insert tags (ignore duplicates)
+    for (const tagId of tagIds) {
+      await db
+        .insert(applicationTags)
+        .values({ application_id: applicationId, tag_id: tagId })
+        .onConflictDoNothing();
+    }
+  }
+
+  /**
+   * Remove tags from an application
+   */
+  async removeTags(applicationId: number, userId: number, tagIds: number[]): Promise<void> {
+    await this.findByIdOrThrow(applicationId, userId);
+
+    await db
+      .delete(applicationTags)
+      .where(
+        and(
+          eq(applicationTags.application_id, applicationId),
+          inArray(applicationTags.tag_id, tagIds)
+        )
+      );
+  }
+
+  /**
+   * Set tags for an application (replace all)
+   */
+  async setTags(applicationId: number, userId: number, tagIds: number[]): Promise<void> {
+    await this.findByIdOrThrow(applicationId, userId);
+
+    // Remove all existing tags
+    await db
+      .delete(applicationTags)
+      .where(eq(applicationTags.application_id, applicationId));
+
+    // Add new tags
+    if (tagIds.length > 0) {
+      await this.addTags(applicationId, userId, tagIds);
+    }
+  }
+
+  // ============================================================================
+  // DOCUMENT METHODS
+  // ============================================================================
+
+  /**
+   * Get documents attached to an application
+   */
+  async getDocuments(applicationId: number, userId: number) {
+    await this.findByIdOrThrow(applicationId, userId);
+
+    return db
+      .select({
+        id: documents.id,
+        doc_type: documents.doc_type,
+        label: documents.label,
+        file_path: documents.file_path,
+        is_default: documents.is_default,
+        doc_role: applicationDocuments.doc_role,
+        attached_at: applicationDocuments.attached_at,
+      })
+      .from(applicationDocuments)
+      .innerJoin(documents, eq(applicationDocuments.document_id, documents.id))
+      .where(eq(applicationDocuments.application_id, applicationId))
+      .orderBy(desc(applicationDocuments.attached_at));
+  }
+
+  /**
+   * Attach documents to an application
+   */
+  async addDocuments(
+    applicationId: number,
+    userId: number,
+    documentIds: number[],
+    docRole?: string
+  ): Promise<void> {
+    await this.findByIdOrThrow(applicationId, userId);
+
+    // Verify all documents belong to the user
+    const userDocs = await db
+      .select()
+      .from(documents)
+      .where(and(inArray(documents.id, documentIds), eq(documents.user_id, userId)));
+
+    if (userDocs.length !== documentIds.length) {
+      throw new NotFoundError("One or more documents not found");
+    }
+
+    // Insert document links (ignore duplicates)
+    for (const docId of documentIds) {
+      await db
+        .insert(applicationDocuments)
+        .values({
+          application_id: applicationId,
+          document_id: docId,
+          doc_role: docRole,
+        })
+        .onConflictDoNothing();
+    }
+  }
+
+  /**
+   * Remove a document from an application
+   */
+  async removeDocument(
+    applicationId: number,
+    userId: number,
+    documentId: number
+  ): Promise<void> {
+    await this.findByIdOrThrow(applicationId, userId);
+
+    await db
+      .delete(applicationDocuments)
+      .where(
+        and(
+          eq(applicationDocuments.application_id, applicationId),
+          eq(applicationDocuments.document_id, documentId)
+        )
+      );
+  }
+
+  /**
+   * Set documents for an application (replace all)
+   */
+  async setDocuments(
+    applicationId: number,
+    userId: number,
+    documentIds: number[],
+    docRole?: string
+  ): Promise<void> {
+    await this.findByIdOrThrow(applicationId, userId);
+
+    // Remove all existing document links
+    await db
+      .delete(applicationDocuments)
+      .where(eq(applicationDocuments.application_id, applicationId));
+
+    // Add new documents
+    if (documentIds.length > 0) {
+      await this.addDocuments(applicationId, userId, documentIds, docRole);
+    }
   }
 }
 

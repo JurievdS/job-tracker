@@ -11,6 +11,7 @@ type UserCompanyNote = typeof userCompanyNotes.$inferSelect;
 
 // Company with user's personal notes attached
 export interface CompanyWithNotes extends Company {
+  industry: string | null;
   user_notes?: string | null;
   user_rating?: number | null;
 }
@@ -41,6 +42,7 @@ export class CompanyService {
         normalized_name: companies.normalized_name,
         website: companies.website,
         location: companies.location,
+        industry: companies.industry,
         created_at: companies.created_at,
         user_notes: userCompanyNotes.notes,
         user_rating: userCompanyNotes.rating,
@@ -103,6 +105,7 @@ export class CompanyService {
         normalized_name: companies.normalized_name,
         website: companies.website,
         location: companies.location,
+        industry: companies.industry,
         created_at: companies.created_at,
         user_notes: userCompanyNotes.notes,
         user_rating: userCompanyNotes.rating,
@@ -190,6 +193,7 @@ export class CompanyService {
         normalized_name: normalizedName,
         website: data.website,
         location: data.location,
+        industry: data.industry,
       })
       .returning();
 

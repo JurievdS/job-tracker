@@ -8,6 +8,7 @@ export const CompanySchema = z.object({
   name: z.string().min(1, "Company name is required"),
   website: z.string().url().optional().or(z.literal("")),
   location: z.string().optional(),
+  industry: z.string().optional(),
 });
 
 export type NewCompany = z.infer<typeof CompanySchema>;

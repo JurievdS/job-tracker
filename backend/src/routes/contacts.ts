@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../middleware/errorHandler.js";
+import { authenticate } from "../middleware/auth.js";
 import { ContactController } from "../controllers/ContactController.js";
 import { ContactService } from "../services/ContactService.js";
 
@@ -48,7 +49,7 @@ const controller = new ContactController(contactService);
  *       200:
  *         description: List of contacts
  */
-router.get("/", asyncHandler(controller.list));
+router.get("/", authenticate, asyncHandler(controller.list));
 
 /**
  * @swagger
@@ -68,7 +69,7 @@ router.get("/", asyncHandler(controller.list));
  *       404:
  *         description: Contact not found
  */
-router.get("/:id", asyncHandler(controller.getById));
+router.get("/:id", authenticate, asyncHandler(controller.getById));
 
 /**
  * @swagger
@@ -86,7 +87,7 @@ router.get("/:id", asyncHandler(controller.getById));
  *       201:
  *         description: Contact created
  */
-router.post("/", asyncHandler(controller.create));
+router.post("/", authenticate, asyncHandler(controller.create));
 
 /**
  * @swagger
@@ -112,7 +113,7 @@ router.post("/", asyncHandler(controller.create));
  *       404:
  *         description: Contact not found
  */
-router.put("/:id", asyncHandler(controller.update));
+router.put("/:id", authenticate, asyncHandler(controller.update));
 
 /**
  * @swagger
@@ -132,6 +133,6 @@ router.put("/:id", asyncHandler(controller.update));
  *       404:
  *         description: Contact not found
  */
-router.delete("/:id", asyncHandler(controller.delete));
+router.delete("/:id", authenticate, asyncHandler(controller.delete));
 
 export default router;

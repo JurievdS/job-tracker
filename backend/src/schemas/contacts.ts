@@ -2,15 +2,24 @@ import { z } from "zod";
 
 export const ContactSchema = z.object({
   name: z.string().min(1, "Contact name is required"),
-  company_id: z.number().int(),
+  company_id: z.number().int().optional(),
   role: z.string().optional(),
-  email: z.string().email().optional(),
-  linkedin: z.string().url().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  phone: z.string().max(50).optional(),
+  linkedin: z.string().url().optional().or(z.literal("")),
   notes: z.string().optional(),
 });
 
 export type NewContact = z.infer<typeof ContactSchema>;
 
-export const UpdateContactSchema = ContactSchema.partial();
+export const UpdateContactSchema = z.object({
+  name: z.string().min(1).optional(),
+  company_id: z.number().int().optional().nullable(),
+  role: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  phone: z.string().max(50).optional(),
+  linkedin: z.string().url().optional().or(z.literal("")),
+  notes: z.string().optional(),
+});
 
 export type UpdateContact = z.infer<typeof UpdateContactSchema>;

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../middleware/errorHandler.js";
+import { authenticate } from "../middleware/auth.js";
 import { ApplicationController } from "../controllers/ApplicationController.js";
 import { ApplicationService } from "../services/ApplicationService.js";
 
@@ -18,12 +19,43 @@ const controller = new ApplicationController(applicationService);
  *       properties:
  *         id:
  *           type: integer
- *         position_id:
+ *         company_id:
  *           type: integer
+ *         job_title:
+ *           type: string
+ *         job_url:
+ *           type: string
+ *         job_description:
+ *           type: string
+ *         requirements:
+ *           type: string
+ *         location:
+ *           type: string
+ *         remote_type:
+ *           type: string
+ *           enum: [onsite, hybrid, remote]
+ *         salary_advertised_min:
+ *           type: integer
+ *         salary_advertised_max:
+ *           type: integer
+ *         salary_offered:
+ *           type: integer
+ *         salary_currency:
+ *           type: string
+ *         salary_period:
+ *           type: string
+ *           enum: [hourly, monthly, annual]
  *         status:
  *           type: string
- *           enum: [bookmarked, applied, phone_screen, technical, final_round, offer, rejected]
+ *           enum: [bookmarked, applied, phone_screen, technical, final_round, offer, rejected, withdrawn, ghosted]
+ *         source:
+ *           type: string
+ *         source_url:
+ *           type: string
  *         date_applied:
+ *           type: string
+ *           format: date
+ *         date_responded:
  *           type: string
  *           format: date
  *         notes:
@@ -40,7 +72,19 @@ const controller = new ApplicationController(applicationService);
  *       200:
  *         description: Counts by status
  */
-router.get("/status-counts", asyncHandler(controller.getStatusCounts));
+router.get("/status-counts", authenticate, asyncHandler(controller.getStatusCounts));
+
+/**
+ * @swagger
+ * /applications/source-metrics:
+ *   get:
+ *     summary: Get application metrics grouped by source
+ *     tags: [Applications]
+ *     responses:
+ *       200:
+ *         description: Metrics by source
+ */
+router.get("/source-metrics", authenticate, asyncHandler(controller.getSourceMetrics));
 
 /**
  * @swagger
@@ -58,7 +102,7 @@ router.get("/status-counts", asyncHandler(controller.getStatusCounts));
  *       200:
  *         description: List of applications
  */
-router.get("/", asyncHandler(controller.list));
+router.get("/", authenticate, asyncHandler(controller.list));
 
 /**
  * @swagger
@@ -78,7 +122,25 @@ router.get("/", asyncHandler(controller.list));
  *       404:
  *         description: Application not found
  */
-router.get("/:id", asyncHandler(controller.getById));
+router.get("/:id", authenticate, asyncHandler(controller.getById));
+
+/**
+ * @swagger
+ * /applications/{id}/status-history:
+ *   get:
+ *     summary: Get status history for an application
+ *     tags: [Applications]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Status history
+ */
+router.get("/:id/status-history", authenticate, asyncHandler(controller.getStatusHistory));
 
 /**
  * @swagger
@@ -96,14 +158,14 @@ router.get("/:id", asyncHandler(controller.getById));
  *       201:
  *         description: Application created
  */
-router.post("/", asyncHandler(controller.create));
+router.post("/", authenticate, asyncHandler(controller.create));
 
 /**
  * @swagger
  * /applications/quick:
  *   post:
- *     summary: Quick create an application with company and position names
- *     description: Creates company and position if they don't exist, then creates the application
+ *     summary: Quick create an application with company name
+ *     description: Creates company if it doesn't exist, then creates the application
  *     tags: [Applications]
  *     requestBody:
  *       required: true
@@ -113,16 +175,19 @@ router.post("/", asyncHandler(controller.create));
  *             type: object
  *             required:
  *               - company_name
- *               - position_title
- *               - status
+ *               - job_title
+ *               - source
  *             properties:
  *               company_name:
  *                 type: string
- *               position_title:
+ *               job_title:
+ *                 type: string
+ *               source:
  *                 type: string
  *               status:
  *                 type: string
- *                 enum: [bookmarked, applied, phone_screen, technical, final_round, offer, rejected]
+ *               job_url:
+ *                 type: string
  *               date_applied:
  *                 type: string
  *                 format: date
@@ -132,7 +197,7 @@ router.post("/", asyncHandler(controller.create));
  *       201:
  *         description: Application created
  */
-router.post("/quick", asyncHandler(controller.quickCreate));
+router.post("/quick", authenticate, asyncHandler(controller.quickCreate));
 
 /**
  * @swagger
@@ -158,7 +223,7 @@ router.post("/quick", asyncHandler(controller.quickCreate));
  *       404:
  *         description: Application not found
  */
-router.put("/:id", asyncHandler(controller.update));
+router.put("/:id", authenticate, asyncHandler(controller.update));
 
 /**
  * @swagger
@@ -187,7 +252,202 @@ router.put("/:id", asyncHandler(controller.update));
  *       404:
  *         description: Application not found
  */
-router.patch("/:id/status", asyncHandler(controller.updateStatus));
+router.patch("/:id/status", authenticate, asyncHandler(controller.updateStatus));
+
+/**
+ * @swagger
+ * /applications/{id}/tags:
+ *   post:
+ *     summary: Add tags to an application
+ *     tags: [Applications]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               tag_ids:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *     responses:
+ *       204:
+ *         description: Tags added
+ */
+router.post("/:id/tags", authenticate, asyncHandler(controller.addTags));
+
+/**
+ * @swagger
+ * /applications/{id}/tags:
+ *   put:
+ *     summary: Set tags for an application (replace all)
+ *     tags: [Applications]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               tag_ids:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *     responses:
+ *       204:
+ *         description: Tags set
+ */
+router.put("/:id/tags", authenticate, asyncHandler(controller.setTags));
+
+/**
+ * @swagger
+ * /applications/{id}/tags:
+ *   delete:
+ *     summary: Remove tags from an application
+ *     tags: [Applications]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               tag_ids:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *     responses:
+ *       204:
+ *         description: Tags removed
+ */
+router.delete("/:id/tags", authenticate, asyncHandler(controller.removeTags));
+
+/**
+ * @swagger
+ * /applications/{id}/documents:
+ *   get:
+ *     summary: Get documents attached to an application
+ *     tags: [Applications]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of attached documents
+ */
+router.get("/:id/documents", authenticate, asyncHandler(controller.getDocuments));
+
+/**
+ * @swagger
+ * /applications/{id}/documents:
+ *   post:
+ *     summary: Attach documents to an application
+ *     tags: [Applications]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - document_ids
+ *             properties:
+ *               document_ids:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *               doc_role:
+ *                 type: string
+ *                 description: Role of documents (e.g., cv_submitted, cover_letter)
+ *     responses:
+ *       204:
+ *         description: Documents attached
+ */
+router.post("/:id/documents", authenticate, asyncHandler(controller.addDocuments));
+
+/**
+ * @swagger
+ * /applications/{id}/documents:
+ *   put:
+ *     summary: Set documents for an application (replace all)
+ *     tags: [Applications]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - document_ids
+ *             properties:
+ *               document_ids:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *               doc_role:
+ *                 type: string
+ *     responses:
+ *       204:
+ *         description: Documents set
+ */
+router.put("/:id/documents", authenticate, asyncHandler(controller.setDocuments));
+
+/**
+ * @swagger
+ * /applications/{id}/documents/{docId}:
+ *   delete:
+ *     summary: Remove a document from an application
+ *     tags: [Applications]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: docId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       204:
+ *         description: Document removed
+ */
+router.delete("/:id/documents/:docId", authenticate, asyncHandler(controller.removeDocument));
 
 /**
  * @swagger
@@ -207,6 +467,6 @@ router.patch("/:id/status", asyncHandler(controller.updateStatus));
  *       404:
  *         description: Application not found
  */
-router.delete("/:id", asyncHandler(controller.delete));
+router.delete("/:id", authenticate, asyncHandler(controller.delete));
 
 export default router;
