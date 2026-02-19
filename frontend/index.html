@@ -4,7 +4,32 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>Job Tracker</title>
+    <script>
+      (function() {
+        var s;
+        try { s = JSON.parse(localStorage.getItem('theme-settings') || '{}'); } catch(e) { s = {}; }
+
+        // If no theme-settings, check legacy 'theme' key
+        if (!s.colorMode) {
+          var t = localStorage.getItem('theme');
+          if (t === 'light' || t === 'dark' || t === 'system') s.colorMode = t;
+        }
+
+        var cm = s.colorMode || 'system';
+        var isDark = cm === 'dark' || (cm !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (s.palette && s.palette !== 'default') document.documentElement.dataset.theme = s.palette;
+        // Cyberpunk always forces dark mode
+        if (s.palette === 'cyberpunk') isDark = true;
+        if (isDark) document.documentElement.classList.add('dark');
+        if (s.density && s.density !== 'comfortable') document.documentElement.dataset.density = s.density;
+        if (s.fontSize && s.fontSize !== 'medium') document.documentElement.dataset.fontSize = s.fontSize;
+        if (s.accentColor) document.documentElement.style.setProperty('--color-primary', s.accentColor);
+      })();
+    </script>
+    <style>
+      body { background-color: var(--color-background, #f3f4f6); }
+    </style>
   </head>
   <body>
     <div id="root"></div>
