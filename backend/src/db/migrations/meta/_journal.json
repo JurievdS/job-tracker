@@ -8,6 +8,34 @@
       "when": 1770480742597,
       "tag": "0000_lean_warlock",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770551834743,
+      "tag": "0001_wide_raza",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770614043337,
+      "tag": "0002_great_nehzno",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1771183814534,
+      "tag": "0003_lovely_warstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1771531541543,
+      "tag": "0004_sour_stark_industries",
+      "breakpoints": true
     }
   ]
 }

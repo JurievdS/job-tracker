@@ -24,6 +24,14 @@ export const refreshTokens = pgTable("refresh_tokens", {
   created_at: timestamp("created_at").defaultNow(),
 });
 
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  token_hash: varchar("token_hash", { length: 64 }).notNull(),
+  expires_at: timestamp("expires_at").notNull(),
+  created_at: timestamp("created_at").defaultNow(),
+});
+
 export const userProfiles = pgTable("user_profiles", {
   id: serial("id").primaryKey(),
   user_id: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
@@ -39,12 +47,23 @@ export const userProfiles = pgTable("user_profiles", {
   education: jsonb("education"),
   skills: jsonb("skills"),
   languages: jsonb("languages"),
-  visa_status: varchar("visa_status", { length: 255 }),
   base_currency: varchar("base_currency", { length: 10 }).default("EUR"),
   salary_expectation_min: integer("salary_expectation_min"),
   salary_expectation_max: integer("salary_expectation_max"),
   updated_at: timestamp("updated_at").defaultNow(),
 });
+
+export const workAuthorizations = pgTable("work_authorizations", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  country_code: varchar("country_code", { length: 3 }).notNull(),
+  status: varchar("status", { length: 50 }).notNull(),
+  expiry_date: date("expiry_date"),
+  notes: text("notes"),
+  created_at: timestamp("created_at").defaultNow(),
+}, (table) => [
+  unique("work_authorizations_user_country_status").on(table.user_id, table.country_code, table.status),
+]);
 
 // ============================================================================
 // COMPANIES
@@ -71,6 +90,37 @@ export const userCompanyNotes = pgTable("user_company_notes", {
 });
 
 // ============================================================================
+// SOURCES (job boards, recruiters, referrals, etc.)
+// ============================================================================
+
+export const sources = pgTable("sources", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  normalized_name: varchar("normalized_name", { length: 100 }).unique(),
+  url: varchar("url", { length: 500 }),
+  logo_url: varchar("logo_url", { length: 500 }),
+  category: varchar("category", { length: 50 }), // job_board, aggregator, company_site, government, recruiter, referral, community, other
+  region: varchar("region", { length: 100 }), // global, EU, NL, ZA, etc.
+  description: text("description"),
+  is_active: boolean("is_active").default(true),
+  usage_count: integer("usage_count").default(0),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at"),
+});
+
+export const userSourceNotes = pgTable("user_source_notes", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  source_id: integer("source_id").references(() => sources.id, { onDelete: "cascade" }).notNull(),
+  notes: text("notes"),
+  rating: integer("rating"),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  unique("user_source_notes_user_source").on(table.user_id, table.source_id),
+]);
+
+// ============================================================================
 // APPLICATIONS (formerly positions + applications combined)
 // ============================================================================
 
@@ -78,6 +128,7 @@ export const applications = pgTable("applications", {
   id: serial("id").primaryKey(),
   user_id: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
   company_id: integer("company_id").references(() => companies.id, { onDelete: "set null" }),
+  source_id: integer("source_id").references(() => sources.id, { onDelete: "set null" }),
 
   // Position info (formerly its own table)
   job_title: varchar("job_title", { length: 255 }).notNull(),
@@ -94,9 +145,13 @@ export const applications = pgTable("applications", {
   salary_currency: varchar("salary_currency", { length: 10 }).default("EUR"),
   salary_period: varchar("salary_period", { length: 20 }),
 
+  // Visa/Eligibility
+  visa_sponsorship: varchar("visa_sponsorship", { length: 50 }),
+  role_country_code: varchar("role_country_code", { length: 3 }),
+  visa_type_id: integer("visa_type_id").references(() => visaTypes.id, { onDelete: "set null" }),
+
   // Application meta
   status: varchar("status", { length: 50 }).default("bookmarked"),
-  source: varchar("source", { length: 100 }).notNull(),
   source_url: varchar("source_url", { length: 500 }),
   date_applied: date("date_applied"),
   date_responded: date("date_responded"),
@@ -204,6 +259,36 @@ export const applicationTags = pgTable("application_tags", {
 }, (table) => [
   unique("application_tags_pk").on(table.application_id, table.tag_id),
 ]);
+
+// ============================================================================
+// VISA REFERENCE DATA
+// ============================================================================
+
+export const visaTypes = pgTable("visa_types", {
+  id: serial("id").primaryKey(),
+  country_code: varchar("country_code", { length: 3 }).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  source_url: varchar("source_url", { length: 500 }),
+  valid_from: date("valid_from").notNull(),
+  valid_until: date("valid_until"),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  unique("visa_types_country_name_validfrom").on(table.country_code, table.name, table.valid_from),
+]);
+
+export const visaRequirements = pgTable("visa_requirements", {
+  id: serial("id").primaryKey(),
+  visa_type_id: integer("visa_type_id").references(() => visaTypes.id, { onDelete: "cascade" }).notNull(),
+  requirement_type: varchar("requirement_type", { length: 50 }).notNull(),
+  condition_label: varchar("condition_label", { length: 255 }),
+  min_value: integer("min_value"),
+  currency: varchar("currency", { length: 10 }),
+  period: varchar("period", { length: 20 }),
+  description: text("description"),
+  created_at: timestamp("created_at").defaultNow(),
+});
 
 // ============================================================================
 // REMINDERS
