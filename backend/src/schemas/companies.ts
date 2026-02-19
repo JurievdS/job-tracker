@@ -6,7 +6,7 @@ import { z } from "zod";
  */
 export const CompanySchema = z.object({
   name: z.string().min(1, "Company name is required"),
-  website: z.string().url().optional().or(z.literal("")),
+  website: z.string().url("Must be a valid URL (e.g. https://example.com)").optional().or(z.literal("")),
   location: z.string().optional(),
   industry: z.string().optional(),
 });

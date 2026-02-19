@@ -134,6 +134,65 @@ router.post("/", authenticate, asyncHandler(controller.create));
 
 /**
  * @swagger
+ * /companies/{id}:
+ *   put:
+ *     summary: Update a company
+ *     description: Updates a global company. Changes affect all users.
+ *     tags: [Companies]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               website:
+ *                 type: string
+ *               location:
+ *                 type: string
+ *               industry:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Company updated
+ *       404:
+ *         description: Company not found
+ *       409:
+ *         description: Company name conflict
+ */
+router.put("/:id", authenticate, asyncHandler(controller.update));
+
+/**
+ * @swagger
+ * /companies/{id}:
+ *   delete:
+ *     summary: Delete a company
+ *     description: Deletes a global company. Linked applications and contacts will have their company reference set to null.
+ *     tags: [Companies]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       204:
+ *         description: Company deleted
+ *       404:
+ *         description: Company not found
+ */
+router.delete("/:id", authenticate, asyncHandler(controller.delete));
+
+/**
+ * @swagger
  * /companies/{id}/notes:
  *   get:
  *     summary: Get user's notes for a company

@@ -22,9 +22,11 @@ export class ApplicationController {
    */
   list = async (req: Request, res: Response) => {
     const status = req.query.status as string | undefined;
+    const companyId = req.query.company_id ? Number(req.query.company_id) : undefined;
     const applications = await this.applicationService.findAll(
       req.userId!,
-      status
+      status,
+      companyId
     );
     res.json(applications);
   };
@@ -134,6 +136,16 @@ export class ApplicationController {
     const applicationId = Number(req.params.id);
     await this.applicationService.delete(applicationId, req.userId!);
     res.status(204).send();
+  };
+
+  /**
+   * GET /applications/:id/tags
+   * Get tags for an application
+   */
+  getTags = async (req: Request, res: Response) => {
+    const applicationId = Number(req.params.id);
+    const app = await this.applicationService.findByIdWithDetails(applicationId, req.userId!);
+    res.json(app.tags || []);
   };
 
   /**

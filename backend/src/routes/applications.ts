@@ -257,6 +257,24 @@ router.patch("/:id/status", authenticate, asyncHandler(controller.updateStatus))
 /**
  * @swagger
  * /applications/{id}/tags:
+ *   get:
+ *     summary: Get tags for an application
+ *     tags: [Applications]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of tags
+ */
+router.get("/:id/tags", authenticate, asyncHandler(controller.getTags));
+
+/**
+ * @swagger
+ * /applications/{id}/tags:
  *   post:
  *     summary: Add tags to an application
  *     tags: [Applications]

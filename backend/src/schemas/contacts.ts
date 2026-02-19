@@ -6,7 +6,7 @@ export const ContactSchema = z.object({
   role: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().max(50).optional(),
-  linkedin: z.string().url().optional().or(z.literal("")),
+  linkedin: z.string().url("Must be a valid URL (e.g. https://example.com)").optional().or(z.literal("")),
   notes: z.string().optional(),
 });
 
@@ -18,7 +18,7 @@ export const UpdateContactSchema = z.object({
   role: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().max(50).optional(),
-  linkedin: z.string().url().optional().or(z.literal("")),
+  linkedin: z.string().url("Must be a valid URL (e.g. https://example.com)").optional().or(z.literal("")),
   notes: z.string().optional(),
 });
 
