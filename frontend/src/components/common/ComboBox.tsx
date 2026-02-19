@@ -80,6 +80,7 @@ export function ComboBox({
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const blurTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const inputId = label?.toLowerCase().replace(/\s+/g, '-');
 
   // Sync input value when external value changes
@@ -103,6 +104,13 @@ export function ComboBox({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [value]);
 
+  // Cleanup blur timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+    };
+  }, []);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setInputValue(newValue);
@@ -112,6 +120,7 @@ export function ComboBox({
   };
 
   const handleSelect = (option: ComboBoxOption) => {
+    if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
     onChange(option);
     setInputValue(option.label);
     setIsOpen(false);
@@ -119,6 +128,7 @@ export function ComboBox({
   };
 
   const handleCreateNew = () => {
+    if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
     if (onCreateNew && inputValue.trim()) {
       onCreateNew(inputValue.trim());
       setIsOpen(false);
@@ -163,6 +173,7 @@ export function ComboBox({
   };
 
   const handleClear = () => {
+    if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
     onChange(null);
     setInputValue('');
     inputRef.current?.focus();
@@ -176,7 +187,7 @@ export function ComboBox({
       {label && (
         <label
           htmlFor={inputId}
-          className="block text-sm font-medium text-gray-700"
+          className="block text-sm font-medium text-text-secondary"
         >
           {label}
         </label>
@@ -189,20 +200,35 @@ export function ComboBox({
           type="text"
           value={inputValue}
           onChange={handleInputChange}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => {
+            setIsOpen(true);
+            onSearch(inputValue);
+          }}
+          onBlur={() => {
+            // Reset unconfirmed input when focus leaves the ComboBox container
+            // setTimeout allows click handlers on dropdown items to fire first
+            blurTimeoutRef.current = setTimeout(() => {
+              if (!containerRef.current?.contains(document.activeElement)) {
+                setIsOpen(false);
+                setInputValue(value?.label || '');
+              }
+            }, 150);
+          }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
           className={`
-            block w-full px-3 py-2 pr-8 rounded-md border shadow-sm text-sm
-            placeholder:text-gray-400
+            block w-full px-[var(--padding-input-x)] py-[var(--padding-input-y)] pr-8 rounded-[var(--radius-md)] border shadow-sm text-sm
+            bg-surface text-text
+            placeholder:text-text-placeholder
             focus:outline-none focus:ring-2 focus:ring-offset-0
-            disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
+            disabled:bg-surface-alt disabled:text-text-muted disabled:cursor-not-allowed
+            transition-colors duration-150
             ${error
-              ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+              ? 'border-danger focus:border-danger focus:ring-danger'
               : hasUnconfirmedInput
-                ? 'border-amber-300 focus:border-amber-500 focus:ring-amber-500'
-                : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                ? 'border-warning focus:border-warning focus:ring-warning'
+                : 'border-border focus:border-border-focus focus:ring-border-focus'
             }
           `}
           aria-invalid={error ? 'true' : 'false'}
@@ -217,7 +243,7 @@ export function ComboBox({
           <button
             type="button"
             onClick={handleClear}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-text-placeholder hover:text-text-secondary transition-colors"
             aria-label="Clear selection"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -230,13 +256,13 @@ export function ComboBox({
       {/* Dropdown */}
       {isOpen && (
         <ul
-          className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
+          className="absolute z-10 w-full mt-1 bg-surface border border-border rounded-[var(--radius-md)] shadow-lg max-h-60 overflow-auto"
           role="listbox"
         >
           {loading ? (
-            <li className="px-3 py-2 text-sm text-gray-500">Loading...</li>
+            <li className="px-3 py-2 text-sm text-text-muted">Loading...</li>
           ) : options.length === 0 && !allowCreate ? (
-            <li className="px-3 py-2 text-sm text-gray-500">No results found</li>
+            <li className="px-3 py-2 text-sm text-text-muted">No results found</li>
           ) : (
             <>
               {options.map((option, index) => (
@@ -245,10 +271,10 @@ export function ComboBox({
                   onClick={() => handleSelect(option)}
                   onMouseEnter={() => setHighlightedIndex(index)}
                   className={`
-                    px-3 py-2 text-sm cursor-pointer
-                    ${highlightedIndex === index ? 'bg-blue-50 text-blue-700' : 'text-gray-900'}
+                    px-3 py-2 text-sm cursor-pointer transition-colors
+                    ${highlightedIndex === index ? 'bg-primary-light text-primary' : 'text-text'}
                     ${value?.value === option.value ? 'font-medium' : ''}
-                    hover:bg-blue-50
+                    hover:bg-primary-light
                   `}
                   role="option"
                   aria-selected={value?.value === option.value}
@@ -263,9 +289,9 @@ export function ComboBox({
                   onClick={handleCreateNew}
                   onMouseEnter={() => setHighlightedIndex(options.length)}
                   className={`
-                    px-3 py-2 text-sm cursor-pointer border-t border-gray-100
-                    ${highlightedIndex === options.length ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}
-                    hover:bg-blue-50
+                    px-3 py-2 text-sm cursor-pointer border-t border-border transition-colors
+                    ${highlightedIndex === options.length ? 'bg-primary-light text-primary' : 'text-text-secondary'}
+                    hover:bg-primary-light
                   `}
                   role="option"
                 >
@@ -279,13 +305,13 @@ export function ComboBox({
 
       {/* Warning for unconfirmed input */}
       {hasUnconfirmedInput && !isOpen && !error && (
-        <p className="text-sm text-amber-600">
+        <p className="text-sm text-warning-text">
           Select from results or click "+ Create" to add this {label?.toLowerCase() || 'option'}
         </p>
       )}
 
       {error && (
-        <p className="text-sm text-red-600">{error}</p>
+        <p className="text-sm text-danger-text">{error}</p>
       )}
     </div>
   );

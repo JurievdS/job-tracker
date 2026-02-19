@@ -12,11 +12,11 @@ interface BadgeProps {
 }
 
 const variantStyles: Record<BadgeVariant, string> = {
-  default: 'bg-gray-100 text-gray-700',
-  success: 'bg-green-100 text-green-700',
-  warning: 'bg-yellow-100 text-yellow-700',
-  danger: 'bg-red-100 text-red-700',
-  info: 'bg-blue-100 text-blue-700',
+  default: 'bg-surface-alt text-text-secondary',
+  success: 'bg-success-light text-success-text',
+  warning: 'bg-warning-light text-warning-text',
+  danger: 'bg-danger-light text-danger-text',
+  info: 'bg-info-light text-info-text',
 };
 
 /**

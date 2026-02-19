@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 
 interface Column<T> {
   /** Key from the data object */
@@ -9,6 +10,8 @@ interface Column<T> {
   render?: (value: T[keyof T], row: T) => ReactNode;
   /** Column width class (e.g., 'w-1/4') */
   width?: string;
+  /** Allow sorting by this column */
+  sortable?: boolean;
 }
 
 interface TableProps<T> {
@@ -25,13 +28,13 @@ interface TableProps<T> {
 }
 
 /**
- * Table - A generic data table component
+ * Table - A generic data table component with optional column sorting
  *
  * Usage:
  * ```tsx
  * const columns = [
- *   { key: 'name', header: 'Name' },
- *   { key: 'email', header: 'Email' },
+ *   { key: 'name', header: 'Name', sortable: true },
+ *   { key: 'email', header: 'Email', sortable: true },
  *   { key: 'status', header: 'Status', render: (val) => <Badge>{val}</Badge> },
  * ];
  *
@@ -49,63 +52,126 @@ export function Table<T extends object>({
   keyExtractor,
   loading = false,
 }: TableProps<T>) {
+  const [sortKey, setSortKey] = useState<keyof T | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
   const getKey = (row: T, index: number): string | number => {
     if (keyExtractor) return keyExtractor(row);
     if ('id' in row) return row.id as string | number;
     return index;
   };
 
+  const handleSort = (key: keyof T) => {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const sortedData = useMemo(() => {
+    if (!sortKey) return data;
+    return [...data].sort((a, b) => {
+      const aVal = a[sortKey];
+      const bVal = b[sortKey];
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [data, sortKey, sortDir]);
+
+  const skeletonWidths = ['w-3/4', 'w-1/2', 'w-2/3'];
+
   if (loading) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-        <div className="animate-pulse text-gray-400">Loading...</div>
+      <div className="bg-surface rounded-[var(--radius-lg)] border border-border overflow-hidden" aria-busy="true">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-surface-alt">
+              <tr>
+                {columns.map((column) => (
+                  <th
+                    key={String(column.key)}
+                    className={`px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider ${column.width || ''}`}
+                  >
+                    {column.header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="bg-surface divide-y divide-border">
+              {Array.from({ length: 5 }).map((_, rowIndex) => (
+                <tr key={rowIndex}>
+                  {columns.map((column, colIndex) => (
+                    <td key={String(column.key)} className="px-4 py-3">
+                      <div className={`animate-pulse h-4 bg-border rounded ${skeletonWidths[(rowIndex + colIndex) % 3]}`} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className="bg-surface rounded-[var(--radius-lg)] border border-border overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-border">
+          <thead className="bg-surface-alt">
             <tr>
               {columns.map((column) => (
                 <th
                   key={String(column.key)}
+                  onClick={column.sortable ? () => handleSort(column.key) : undefined}
                   className={`
-                    px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider
+                    px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider
                     ${column.width || ''}
+                    ${column.sortable ? 'cursor-pointer select-none hover:text-text transition-colors' : ''}
                   `}
                 >
-                  {column.header}
+                  <span className="inline-flex items-center gap-1">
+                    {column.header}
+                    {column.sortable && sortKey === column.key && (
+                      sortDir === 'asc'
+                        ? <ChevronUp className="w-3.5 h-3.5" />
+                        : <ChevronDown className="w-3.5 h-3.5" />
+                    )}
+                  </span>
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {data.length === 0 ? (
+          <tbody className="bg-surface divide-y divide-border">
+            {sortedData.length === 0 ? (
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-8 text-center text-gray-500"
+                  className="px-4 py-8 text-center text-text-placeholder"
                 >
-                  No data available
+                  No results to display
                 </td>
               </tr>
             ) : (
-              data.map((row, index) => (
+              sortedData.map((row, index) => (
                 <tr
                   key={getKey(row, index)}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                   className={`
-                    ${onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
+                    ${onRowClick ? 'cursor-pointer hover:bg-surface-alt' : ''}
                     transition-colors
                   `}
                 >
                   {columns.map((column) => (
                     <td
                       key={String(column.key)}
-                      className="px-4 py-3 text-sm text-gray-900"
+                      className="px-4 py-3 text-sm text-text"
                     >
                       {column.render
                         ? column.render(row[column.key], row)

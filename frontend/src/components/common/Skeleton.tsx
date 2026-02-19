@@ -10,11 +10,11 @@ interface SkeletonProps {
  */
 export function Skeleton({ lines = 3, className = '' }: SkeletonProps) {
     return (
-        <div className={`animate-pulse space-y-2 ${className}`}>
+        <div className={`animate-pulse space-y-2 ${className}`} aria-hidden="true">
             {Array.from({ length: lines }).map((_, index) => (
                 <div
                     key={index}
-                    className="h-4 bg-gray-300 rounded w-full"
+                    className="h-4 bg-border rounded w-full"
                 ></div>
             ))}
         </div>
@@ -23,11 +23,11 @@ export function Skeleton({ lines = 3, className = '' }: SkeletonProps) {
 
 export function SkeletonText({ lines = 3, className = '' }: SkeletonProps) {
     return (
-        <div className={`animate-pulse space-y-2 ${className}`}>
+        <div className={`animate-pulse space-y-2 ${className}`} aria-hidden="true">
             {Array.from({ length: lines }).map((_, index) => (
                 <div
                     key={index}
-                    className="h-4 bg-gray-300 rounded w-full"
+                    className="h-4 bg-border rounded w-full"
                 ></div>
             ))}
         </div>

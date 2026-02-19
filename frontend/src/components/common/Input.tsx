@@ -1,4 +1,4 @@
-import { forwardRef, type InputHTMLAttributes } from 'react';
+import { forwardRef, type InputHTMLAttributes, type ReactNode } from 'react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   /** Label text */
@@ -7,7 +7,22 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   /** Helper text */
   helperText?: string;
+  /** Element rendered inside the input, left-aligned (e.g. search icon) */
+  startElement?: ReactNode;
+  /** Element rendered inside the input, right-aligned (e.g. password toggle, clear button) */
+  endElement?: ReactNode;
 }
+
+const baseInputClasses = `
+  block w-full px-[var(--padding-input-x)] py-[var(--padding-input-y)] rounded-[var(--radius-md)] border shadow-sm text-sm
+  placeholder:text-text-placeholder
+  focus:outline-none focus:ring-2 focus:ring-offset-0
+  disabled:bg-surface-alt disabled:text-text-muted disabled:cursor-not-allowed
+  bg-surface text-text transition-colors duration-150
+`;
+
+const normalBorder = 'border-border focus:border-border-focus focus:ring-border-focus';
+const errorBorder = 'border-danger focus:border-danger focus:ring-danger';
 
 /**
  * Input - A form input with label and error states
@@ -31,8 +46,28 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
  * ```
  */
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, helperText, className = '', id, ...props }, ref) => {
+  ({ label, error, helperText, startElement, endElement, className = '', id, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
+    const hasAdornment = !!(startElement || endElement);
+
+    const inputEl = (
+      <input
+        ref={ref}
+        id={inputId}
+        className={`
+          ${baseInputClasses}
+          ${error ? errorBorder : normalBorder}
+          ${startElement ? 'pl-9' : ''}
+          ${endElement ? 'pr-10' : ''}
+          ${className}
+        `}
+        aria-invalid={error ? 'true' : 'false'}
+        aria-describedby={
+          error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined
+        }
+        {...props}
+      />
+    );
 
     return (
       <div className="space-y-1">
@@ -40,44 +75,41 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm font-medium text-text-secondary"
           >
             {label}
           </label>
         )}
 
-        {/* Input */}
-        <input
-          ref={ref}
-          id={inputId}
-          className={`
-            block w-full px-3 py-2 rounded-md border shadow-sm text-sm
-            placeholder:text-gray-400
-            focus:outline-none focus:ring-2 focus:ring-offset-0
-            disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
-            ${error
-              ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-              : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
-            }
-            ${className}
-          `}
-          aria-invalid={error ? 'true' : 'false'}
-          aria-describedby={
-            error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined
-          }
-          {...props}
-        />
+        {/* Input with optional start/end elements */}
+        {hasAdornment ? (
+          <div className="relative">
+            {startElement && (
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-placeholder">
+                {startElement}
+              </div>
+            )}
+            {inputEl}
+            {endElement && (
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                {endElement}
+              </div>
+            )}
+          </div>
+        ) : (
+          inputEl
+        )}
 
         {/* Error message */}
         {error && (
-          <p id={`${inputId}-error`} className="text-sm text-red-600">
+          <p id={`${inputId}-error`} className="text-sm text-danger-text">
             {error}
           </p>
         )}
 
         {/* Helper text */}
         {helperText && !error && (
-          <p id={`${inputId}-helper`} className="text-sm text-gray-500">
+          <p id={`${inputId}-helper`} className="text-sm text-text-muted">
             {helperText}
           </p>
         )}
@@ -106,7 +138,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm font-medium text-text-secondary"
           >
             {label}
           </label>
@@ -116,14 +148,8 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           ref={ref}
           id={inputId}
           className={`
-            block w-full px-3 py-2 rounded-md border shadow-sm text-sm
-            placeholder:text-gray-400
-            focus:outline-none focus:ring-2 focus:ring-offset-0
-            disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
-            ${error
-              ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-              : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
-            }
+            ${baseInputClasses}
+            ${error ? errorBorder : normalBorder}
             ${className}
           `}
           aria-invalid={error ? 'true' : 'false'}
@@ -131,11 +157,11 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         />
 
         {error && (
-          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-sm text-danger-text">{error}</p>
         )}
 
         {helperText && !error && (
-          <p className="text-sm text-gray-500">{helperText}</p>
+          <p className="text-sm text-text-muted">{helperText}</p>
         )}
       </div>
     );
@@ -185,7 +211,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm font-medium text-text-secondary"
           >
             {label}
           </label>
@@ -196,13 +222,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           id={inputId}
           multiple={multiple}
           className={`
-            block w-full px-3 py-2 rounded-md border shadow-sm text-sm
-            focus:outline-none focus:ring-2 focus:ring-offset-0
-            disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
-            ${error
-              ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-              : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
-            }
+            ${baseInputClasses}
+            ${error ? errorBorder : normalBorder}
             ${className}
           `}
           aria-invalid={error ? 'true' : 'false'}
@@ -216,7 +237,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         </select>
 
         {error && (
-          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-sm text-danger-text">{error}</p>
         )}
       </div>
     );

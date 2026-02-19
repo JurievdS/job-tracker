@@ -27,13 +27,13 @@ export function Form({ title, children, className = '', onSubmit }: FormProps) {
   return (
     <form
       className={`
-        bg-white rounded-lg shadow-sm border border-gray-200 p-6
+        bg-surface rounded-[var(--radius-lg)] shadow-sm border border-border p-6 transition-colors
         ${className}
       `}
       onSubmit={onSubmit}
     >
       {title && (
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">{title}</h2>
+        <h2 className="text-xl font-semibold text-text mb-4">{title}</h2>
       )}
       {children}
     </form>
