@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import bcrypt from "bcrypt";
 import jwt, { SignOptions } from "jsonwebtoken";
 
@@ -39,4 +40,12 @@ export async function hashToken(token: string): Promise<string> {
 
 export async function verifyTokenHash(token: string, hash: string): Promise<boolean> {
   return bcrypt.compare(token, hash);
+}
+
+export function generateResetToken(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+export function hashResetToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
 }

@@ -59,7 +59,6 @@ export class UserProfileService {
         education: data.education,
         skills: data.skills,
         languages: data.languages,
-        visa_status: data.visa_status,
         base_currency: data.base_currency,
         salary_expectation_min: data.salary_expectation_min,
         salary_expectation_max: data.salary_expectation_max,
