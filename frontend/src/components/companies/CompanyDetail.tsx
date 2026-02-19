@@ -1,54 +1,90 @@
 import { useState, useEffect } from 'react';
-import type { Company } from '@/types/company';
+import { useNavigate } from 'react-router-dom';
+import { MapPin, ExternalLink, Building2, Users, Pencil, Briefcase, Trash2, Calendar } from 'lucide-react';
+import type { CompanyWithNotes } from '@/types/company';
 import type { Contact } from '@/types/contact';
+import type { Application } from '@/types/application';
 import { companiesApi } from '@/api/companies';
 import { contactsApi } from '@/api/contacts';
-import { Card, Skeleton, Button, Textarea, Input, Modal, Form } from '@/components/common';
+import { applicationsApi } from '@/api/applications';
+import { Card, Skeleton, Button, Input, Textarea, EmptyState, StarRating, StatusBadge, Modal } from '@/components/common';
+import { useToast } from '@/contexts/ToastContext';
+import { formatDate } from '@/utils/date';
+import { parseApiError } from '@/utils/errors';
+import { normalizeUrl } from '@/utils/url';
+import { ROUTES } from '@/routes/routes';
+import { ContactCard } from './ContactCard';
+import { AddContactPanel } from './AddContactPanel';
+
+const displayUrl = (url: string) =>
+  url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
 interface CompanyDetailProps {
-  company: Company | null;
+  company: CompanyWithNotes | null;
   loading?: boolean;
+  onCompanyUpdate?: (company: CompanyWithNotes) => void;
+  onCompanyDelete?: (id: number) => void;
+  onAddCompany?: () => void;
 }
 
-export function CompanyDetail({ company, loading }: CompanyDetailProps) {
-  // Notes state
+export function CompanyDetail({ company, loading, onCompanyUpdate, onCompanyDelete, onAddCompany }: CompanyDetailProps) {
+  const { addToast } = useToast();
+  const navigate = useNavigate();
+
+  // Company edit state
+  const [isEditingCompany, setIsEditingCompany] = useState(false);
+  const [isSavingCompany, setIsSavingCompany] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editIndustry, setEditIndustry] = useState('');
+  const [editWebsite, setEditWebsite] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Notes + rating state
   const [notes, setNotes] = useState('');
+  const [rating, setRating] = useState<number | null>(null);
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [isSavingNotes, setIsSavingNotes] = useState(false);
-  const [notesError, setNotesError] = useState<string | null>(null);
 
   // Contacts state
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
-
-  // Add contact modal state
   const [isAddContactModalOpen, setIsAddContactModalOpen] = useState(false);
-  const [newContactName, setNewContactName] = useState('');
-  const [newContactRole, setNewContactRole] = useState('');
-  const [newContactEmail, setNewContactEmail] = useState('');
-  const [newContactLinkedin, setNewContactLinkedin] = useState('');
-  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
-  const [contactError, setContactError] = useState<string | null>(null);
 
-  // Load notes and contacts when company changes
+  // Delete state
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Applications state
+  const [companyApplications, setCompanyApplications] = useState<Application[]>([]);
+  const [isLoadingApplications, setIsLoadingApplications] = useState(false);
+
+  // Reset edit state when company changes
+  useEffect(() => {
+    setIsEditingCompany(false);
+    setEditError(null);
+  }, [company?.id]);
+
+  // Load notes, contacts, and applications when company changes
   useEffect(() => {
     if (!company) {
       setNotes('');
+      setRating(null);
       setContacts([]);
+      setCompanyApplications([]);
       return;
     }
 
-    // Load notes
     const loadNotes = async () => {
       try {
         const userNotes = await companiesApi.getNotes(company.id);
         setNotes(userNotes?.notes || '');
+        setRating(userNotes?.rating ?? null);
       } catch (err) {
         console.error('Failed to load notes:', err);
       }
     };
 
-    // Load contacts
     const loadContacts = async () => {
       setIsLoadingContacts(true);
       try {
@@ -61,74 +97,118 @@ export function CompanyDetail({ company, loading }: CompanyDetailProps) {
       }
     };
 
+    const loadApplications = async () => {
+      setIsLoadingApplications(true);
+      try {
+        const data = await applicationsApi.list(undefined, company.id);
+        setCompanyApplications(data);
+      } catch (err) {
+        console.error('Failed to load applications:', err);
+      } finally {
+        setIsLoadingApplications(false);
+      }
+    };
+
     loadNotes();
     loadContacts();
+    loadApplications();
   }, [company?.id]);
+
+  // Start editing company
+  const handleStartEditCompany = () => {
+    if (!company) return;
+    setEditName(company.name);
+    setEditIndustry(company.industry || '');
+    setEditWebsite(company.website || '');
+    setEditLocation(company.location || '');
+    setEditError(null);
+    setIsEditingCompany(true);
+  };
+
+  // Save company edits
+  const handleSaveCompany = async () => {
+    if (!company) return;
+    if (!editName.trim()) {
+      setEditError('Company name is required');
+      return;
+    }
+
+    setIsSavingCompany(true);
+    setEditError(null);
+
+    try {
+      const updated = await companiesApi.update(company.id, {
+        name: editName.trim(),
+        industry: editIndustry.trim() || undefined,
+        website: normalizeUrl(editWebsite),
+        location: editLocation.trim() || undefined,
+      });
+
+      const updatedWithNotes: CompanyWithNotes = {
+        ...updated,
+        user_notes: company.user_notes,
+        user_rating: company.user_rating,
+      };
+
+      onCompanyUpdate?.(updatedWithNotes);
+      setIsEditingCompany(false);
+      addToast('Company updated');
+    } catch (err) {
+      setEditError(parseApiError(err, 'Failed to update company'));
+    } finally {
+      setIsSavingCompany(false);
+    }
+  };
 
   // Save notes handler
   const handleSaveNotes = async () => {
     if (!company) return;
 
     setIsSavingNotes(true);
-    setNotesError(null);
     try {
-      await companiesApi.setNotes(company.id, { notes });
+      await companiesApi.setNotes(company.id, {
+        notes,
+        rating: rating ?? undefined,
+      });
       setIsEditingNotes(false);
-    } catch (err) {
-      setNotesError('Failed to save notes');
-      console.error('Failed to save notes:', err);
+      addToast('Notes saved');
+    } catch {
+      addToast('Failed to save notes', 'error');
     } finally {
       setIsSavingNotes(false);
     }
   };
 
-  // Add contact handlers
-  const handleOpenAddContact = () => {
-    setIsAddContactModalOpen(true);
-    setContactError(null);
-  };
-
-  const handleCloseAddContact = () => {
-    setIsAddContactModalOpen(false);
-    setNewContactName('');
-    setNewContactRole('');
-    setNewContactEmail('');
-    setNewContactLinkedin('');
-    setContactError(null);
-  };
-
-  const handleSubmitContact = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Star rating change — saves immediately with optimistic update
+  const handleRatingChange = async (newRating: number | null) => {
     if (!company) return;
-
-    if (!newContactName.trim()) {
-      setContactError('Contact name is required');
-      return;
-    }
-
-    setIsSubmittingContact(true);
-    setContactError(null);
-
+    const prevRating = rating;
+    setRating(newRating);
     try {
-      const newContact = await contactsApi.create({
-        name: newContactName.trim(),
-        company_id: company.id,
-        role: newContactRole.trim() || undefined,
-        email: newContactEmail.trim() || undefined,
-        linkedin: newContactLinkedin.trim()
-          ? (newContactLinkedin.trim().startsWith('http')
-              ? newContactLinkedin.trim()
-              : `https://${newContactLinkedin.trim()}`)
-          : undefined,
+      await companiesApi.setNotes(company.id, {
+        notes,
+        rating: newRating ?? undefined,
       });
+      onCompanyUpdate?.({ ...company, user_rating: newRating });
+    } catch {
+      setRating(prevRating);
+      addToast('Failed to save rating', 'error');
+    }
+  };
 
-      setContacts((prev) => [...prev, newContact]);
-      handleCloseAddContact();
+  // Delete company
+  const handleDeleteCompany = async () => {
+    if (!company) return;
+    setIsDeleting(true);
+    try {
+      await companiesApi.delete(company.id);
+      onCompanyDelete?.(company.id);
+      addToast('Company deleted');
     } catch (err) {
-      setContactError('Failed to add contact');
-      console.error('Failed to add contact:', err);
+      addToast(parseApiError(err, 'Failed to delete company'), 'error');
     } finally {
-      setIsSubmittingContact(false);
+      setIsDeleting(false);
+      setIsDeleteConfirmOpen(false);
     }
   };
 
@@ -149,98 +229,149 @@ export function CompanyDetail({ company, loading }: CompanyDetailProps) {
     );
   }
 
-  // Empty state
+  // Empty state — no company selected
   if (!company) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg
-              className="w-8 h-8 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-              />
-            </svg>
+          <div className="w-16 h-16 bg-surface-alt rounded-full flex items-center justify-center mx-auto mb-4">
+            <Building2 className="w-8 h-8 text-text-placeholder" />
           </div>
-          <p className="text-gray-500">Select a company to view details</p>
+          <p className="text-text-muted mb-1">Select a company to view details</p>
+          {onAddCompany && (
+            <Button variant="ghost" size="sm" onClick={onAddCompany}>
+              or add a new one
+            </Button>
+          )}
         </div>
       </div>
     );
   }
 
-  // Actual content
   return (
     <div className="space-y-6">
       {/* Company Header */}
       <Card>
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">{company.name}</h2>
-            {company.location && (
-              <p className="text-gray-500 mt-1 flex items-center gap-1">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                </svg>
-                {company.location}
-              </p>
+        {isEditingCompany ? (
+          <div className="space-y-3">
+            {editError && (
+              <div className="bg-danger-light text-danger-text p-3 rounded-[var(--radius-md)] text-sm">
+                {editError}
+              </div>
             )}
-          </div>
-          {company.website && (
-            <a
-              href={company.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <Input
+              label="Company Name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              required
+            />
+            <Input
+              label="Industry"
+              value={editIndustry}
+              onChange={(e) => setEditIndustry(e.target.value)}
+              placeholder="e.g., Technology, Finance"
+            />
+            <Input
+              label="Location"
+              value={editLocation}
+              onChange={(e) => setEditLocation(e.target.value)}
+              placeholder="e.g., Mountain View, CA"
+            />
+            <Input
+              label="Website"
+              value={editWebsite}
+              onChange={(e) => setEditWebsite(e.target.value)}
+              placeholder="e.g., example.com"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsEditingCompany(false)}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleSaveCompany} loading={isSavingCompany}>
+                Save
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-start justify-between">
+              <h2 className="text-2xl font-bold text-text">{company.name}</h2>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleStartEditCompany}
+                  icon={<Pencil className="w-3.5 h-3.5" />}
+                  aria-label="Edit company"
                 />
-              </svg>
-              Website
-            </a>
-          )}
-        </div>
-      </Card>
-
-        {/* Notes */}
-      <Card title="Your Notes">
-        {notesError && (
-          <div className="mb-3 bg-red-50 text-red-700 p-2 rounded text-sm">
-            {notesError}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsDeleteConfirmOpen(true)}
+                  icon={<Trash2 className="w-3.5 h-3.5" />}
+                  className="text-danger hover:bg-danger-light"
+                  aria-label="Delete company"
+                />
+              </div>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 mt-4">
+              {company.industry && (
+                <div>
+                  <dt className="text-xs font-medium text-text-muted tracking-wide uppercase">Industry</dt>
+                  <dd className="text-sm text-text mt-0.5 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+                    {company.industry}
+                  </dd>
+                </div>
+              )}
+              {company.location && (
+                <div>
+                  <dt className="text-xs font-medium text-text-muted tracking-wide uppercase">Location</dt>
+                  <dd className="text-sm text-text mt-0.5 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+                    {company.location}
+                  </dd>
+                </div>
+              )}
+              {company.website && (
+                <div>
+                  <dt className="text-xs font-medium text-text-muted tracking-wide uppercase">Website</dt>
+                  <dd className="text-sm mt-0.5">
+                    <a
+                      href={company.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      {displayUrl(company.website)}
+                      <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                    </a>
+                  </dd>
+                </div>
+              )}
+              <div>
+                <dt className="text-xs font-medium text-text-muted tracking-wide uppercase">Added</dt>
+                <dd className="text-sm text-text mt-0.5 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+                  {formatDate(company.created_at)}
+                </dd>
+              </div>
+            </dl>
           </div>
         )}
+      </Card>
+
+      {/* Notes + Rating */}
+      <Card>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold text-text">Your Notes</h3>
+          <StarRating value={rating} onChange={handleRatingChange} size="md" />
+        </div>
+
         {isEditingNotes ? (
           <div className="space-y-3">
             <Textarea
@@ -265,12 +396,13 @@ export function CompanyDetail({ company, loading }: CompanyDetailProps) {
         ) : (
           <div
             onClick={() => setIsEditingNotes(true)}
-            className="cursor-pointer group"
+            className="cursor-pointer group relative rounded-[var(--radius-md)] p-2 -m-2 hover:bg-surface-alt transition-colors"
           >
+            <Pencil className="absolute top-2 right-2 w-3.5 h-3.5 text-text-placeholder opacity-0 group-hover:opacity-100 transition-opacity" />
             {notes ? (
-              <p className="text-gray-700 whitespace-pre-wrap">{notes}</p>
+              <p className="text-text-secondary whitespace-pre-wrap">{notes}</p>
             ) : (
-              <p className="text-gray-400 italic group-hover:text-gray-500">
+              <p className="text-text-placeholder italic group-hover:text-text-muted">
                 Click to add notes about this company...
               </p>
             )}
@@ -278,8 +410,83 @@ export function CompanyDetail({ company, loading }: CompanyDetailProps) {
         )}
       </Card>
 
+      {/* Applications */}
+      <Card>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-text">Applications</h3>
+            {companyApplications.length > 0 && (
+              <span className="text-xs bg-surface-alt text-text-muted px-2 py-0.5 rounded-full">
+                {companyApplications.length}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {isLoadingApplications ? (
+          <div className="space-y-2">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : companyApplications.length > 0 ? (
+          <div className="space-y-2">
+            {companyApplications.map((app) => (
+              <div
+                key={app.id}
+                onClick={() => navigate(ROUTES.APPLICATIONS, { state: { openApplicationId: app.id } })}
+                className="flex items-center justify-between p-2.5 rounded-[var(--radius-md)] bg-surface-alt cursor-pointer hover:bg-surface-hover transition-colors"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(ROUTES.APPLICATIONS, { state: { openApplicationId: app.id } });
+                  }
+                }}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-text truncate">{app.job_title}</p>
+                  {app.date_applied && (
+                    <p className="text-xs text-text-muted">{formatDate(app.date_applied)}</p>
+                  )}
+                </div>
+                <StatusBadge status={app.status || 'bookmarked'} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={<Briefcase className="w-8 h-8" />}
+            title="No applications yet"
+            description="Applications at this company will appear here"
+          />
+        )}
+      </Card>
+
       {/* Contacts */}
-      <Card title="Contacts">
+      <Card>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-text">Contacts</h3>
+            {contacts.length > 0 && (
+              <span className="text-xs bg-surface-alt text-text-muted px-2 py-0.5 rounded-full">
+                {contacts.length}
+              </span>
+            )}
+          </div>
+          {contacts.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsAddContactModalOpen(true)}
+              icon={<Users className="w-4 h-4" />}
+            >
+              Add
+            </Button>
+          )}
+        </div>
+
         {isLoadingContacts ? (
           <div className="space-y-3">
             {Array.from({ length: 2 }).map((_, i) => (
@@ -293,143 +500,68 @@ export function CompanyDetail({ company, loading }: CompanyDetailProps) {
             ))}
           </div>
         ) : contacts.length > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-1">
             {contacts.map((contact) => (
-              <div
+              <ContactCard
                 key={contact.id}
-                className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50"
-              >
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 font-medium text-sm">
-                    {contact.name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 truncate">
-                    {contact.name}
-                  </p>
-                  {contact.role && (
-                    <p className="text-sm text-gray-500 truncate">{contact.role}</p>
-                  )}
-                </div>
-                {contact.email && (
-                  <a
-                    href={`mailto:${contact.email}`}
-                    className="text-gray-400 hover:text-gray-600"
-                    title={contact.email}
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  </a>
-                )}
-                {contact.linkedin && (
-                  <a
-                    href={contact.linkedin}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-gray-400 hover:text-blue-600"
-                    title="LinkedIn"
-                  >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
-                    </svg>
-                  </a>
-                )}
-              </div>
+                contact={contact}
+                onUpdate={(updated) => {
+                  setContacts((prev) =>
+                    prev.map((c) => (c.id === updated.id ? updated : c))
+                  );
+                }}
+                onDelete={(id) => {
+                  setContacts((prev) => prev.filter((c) => c.id !== id));
+                }}
+              />
             ))}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleOpenAddContact}
-              className="w-full mt-2"
-            >
-              + Add Contact
-            </Button>
           </div>
         ) : (
-          <div className="text-center py-6">
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <svg
-                className="w-6 h-6 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-            </div>
-            <p className="text-gray-500 text-sm mb-3">No contacts yet</p>
-            <Button variant="secondary" size="sm" onClick={handleOpenAddContact}>
-              + Add Contact
-            </Button>
-          </div>
+          <EmptyState
+            icon={<Users className="w-8 h-8" />}
+            title="No contacts yet"
+            description="Add contacts you know at this company"
+            action={{
+              label: '+ Add Contact',
+              onClick: () => setIsAddContactModalOpen(true),
+            }}
+          />
         )}
       </Card>
 
       {/* Add Contact Modal */}
-      <Modal
+      <AddContactPanel
+        companyId={company.id}
         isOpen={isAddContactModalOpen}
-        onClose={handleCloseAddContact}
-        title="Add Contact"
+        onClose={() => setIsAddContactModalOpen(false)}
+        onCreated={(newContact) => {
+          setContacts((prev) => [...prev, newContact]);
+        }}
+      />
+
+      {/* Delete Company Confirmation */}
+      <Modal
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        title="Delete Company"
+        size="sm"
       >
-        <Form onSubmit={handleSubmitContact}>
-          <div className="space-y-4">
-            {contactError && (
-              <div className="bg-red-50 text-red-700 p-3 rounded-md text-sm">
-                {contactError}
-              </div>
-            )}
-
-            <Input
-              label="Name"
-              value={newContactName}
-              onChange={(e) => setNewContactName(e.target.value)}
-              placeholder="e.g., John Smith"
-              required
-            />
-
-            <Input
-              label="Role"
-              value={newContactRole}
-              onChange={(e) => setNewContactRole(e.target.value)}
-              placeholder="e.g., Recruiter"
-            />
-
-            <Input
-              label="Email"
-              type="email"
-              value={newContactEmail}
-              onChange={(e) => setNewContactEmail(e.target.value)}
-              placeholder="e.g., john@company.com"
-            />
-
-            <Input
-              label="LinkedIn"
-              value={newContactLinkedin}
-              onChange={(e) => setNewContactLinkedin(e.target.value)}
-              placeholder="e.g., https://linkedin.com/in/johnsmith"
-            />
-
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleCloseAddContact}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" loading={isSubmittingContact}>
-                Add Contact
-              </Button>
-            </div>
+        <div className="space-y-4">
+          <p className="text-text-secondary">
+            Are you sure you want to delete <strong>{company.name}</strong>?
+          </p>
+          <p className="text-sm text-text-muted">
+            Applications and contacts linked to this company will lose their company reference. This cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setIsDeleteConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleDeleteCompany} loading={isDeleting}>
+              Delete
+            </Button>
           </div>
-        </Form>
+        </div>
       </Modal>
     </div>
   );

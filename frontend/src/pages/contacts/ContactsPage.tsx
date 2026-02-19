@@ -3,14 +3,20 @@ import type { Contact, CreateContactDto, UpdateContactDto } from '@/types/contac
 import type { Company } from '@/types/company';
 import { contactsApi } from '@/api/contacts';
 import { companiesApi } from '@/api/companies';
-import { Button, Input, Textarea, Select, Modal, Form, Table, ComboBox, type ComboBoxOption } from '@/components/common';
+import { useToast } from '@/contexts/ToastContext';
+import { parseApiError } from '@/utils/errors';
+import { normalizeUrl } from '@/utils/url';
+import { Search, Plus, ExternalLink, Trash2, Users } from 'lucide-react';
+import { Button, Input, Textarea, Select, Modal, Form, Table, ComboBox, PageHeader, EmptyState, Alert, type ComboBoxOption } from '@/components/common';
 
 export function ContactsPage() {
+  const { addToast } = useToast();
+
   // Data state
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Filter state
   const [filterCompanyId, setFilterCompanyId] = useState<string>('');
@@ -27,6 +33,7 @@ export function ContactsPage() {
   const [companySearchResults, setCompanySearchResults] = useState<ComboBoxOption[]>([]);
   const [formRole, setFormRole] = useState('');
   const [formEmail, setFormEmail] = useState('');
+  const [formPhone, setFormPhone] = useState('');
   const [formLinkedin, setFormLinkedin] = useState('');
   const [formNotes, setFormNotes] = useState('');
 
@@ -40,7 +47,7 @@ export function ContactsPage() {
       const data = await contactsApi.list(companyId);
       setContacts(data);
     } catch (err) {
-      setError('Failed to fetch contacts');
+      addToast('Failed to fetch contacts', 'error');
       console.error('Failed to fetch contacts', err);
     }
   };
@@ -48,7 +55,6 @@ export function ContactsPage() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      setError(null);
       try {
         const [contactsData, companiesData] = await Promise.all([
           contactsApi.list(),
@@ -57,7 +63,7 @@ export function ContactsPage() {
         setContacts(contactsData);
         setCompanies(companiesData);
       } catch (err) {
-        setError('Failed to fetch data');
+        addToast('Failed to fetch data', 'error');
         console.error('Failed to fetch data', err);
       } finally {
         setLoading(false);
@@ -100,9 +106,10 @@ export function ContactsPage() {
     setCompanySearchResults(companies.map((c) => ({ value: String(c.id), label: c.name })));
     setFormRole('');
     setFormEmail('');
+    setFormPhone('');
     setFormLinkedin('');
     setFormNotes('');
-    setError(null);
+    setFormError(null);
   };
 
   const handleCompanySearch = (term: string) => {
@@ -129,9 +136,10 @@ export function ContactsPage() {
     setCompanySearchResults(companies.map((c) => ({ value: String(c.id), label: c.name })));
     setFormRole(contact.role || '');
     setFormEmail(contact.email || '');
+    setFormPhone(contact.phone || '');
     setFormLinkedin(contact.linkedin || '');
     setFormNotes(contact.notes || '');
-    setError(null);
+    setFormError(null);
     setIsModalOpen(true);
   };
 
@@ -145,12 +153,12 @@ export function ContactsPage() {
     e.preventDefault();
 
     if (!formName.trim()) {
-      setError('Name is required');
+      setFormError('Name is required');
       return;
     }
 
     setIsSubmitting(true);
-    setError(null);
+    setFormError(null);
 
     try {
       if (editingContact) {
@@ -159,7 +167,8 @@ export function ContactsPage() {
           company_id: formCompany ? Number(formCompany.value) : undefined,
           role: formRole.trim() || undefined,
           email: formEmail.trim() || undefined,
-          linkedin: formLinkedin.trim() || undefined,
+          phone: formPhone.trim() || undefined,
+          linkedin: normalizeUrl(formLinkedin),
           notes: formNotes.trim() || undefined,
         };
 
@@ -170,18 +179,19 @@ export function ContactsPage() {
           company_id: formCompany ? Number(formCompany.value) : 0,
           role: formRole.trim() || undefined,
           email: formEmail.trim() || undefined,
-          linkedin: formLinkedin.trim() || undefined,
+          phone: formPhone.trim() || undefined,
+          linkedin: normalizeUrl(formLinkedin),
           notes: formNotes.trim() || undefined,
         };
 
         await contactsApi.create(createData);
       }
 
+      addToast(editingContact ? 'Contact updated' : 'Contact created', 'success');
       await fetchContacts();
       handleCloseModal();
     } catch (err) {
-      setError(editingContact ? 'Failed to update contact' : 'Failed to create contact');
-      console.error('Submit error', err);
+      setFormError(parseApiError(err, editingContact ? 'Failed to update contact' : 'Failed to create contact'));
     } finally {
       setIsSubmitting(false);
     }
@@ -202,8 +212,9 @@ export function ContactsPage() {
       setContacts((prev) => prev.filter((c) => c.id !== contactToDelete.id));
       setIsDeleteModalOpen(false);
       setContactToDelete(null);
+      addToast('Contact deleted', 'success');
     } catch (err) {
-      setError('Failed to delete contact');
+      addToast('Failed to delete contact', 'error');
       console.error('Delete error', err);
     } finally {
       setIsSubmitting(false);
@@ -215,17 +226,20 @@ export function ContactsPage() {
       key: 'name' as const,
       header: 'Name',
       width: 'w-1/5',
+      sortable: true,
     },
     {
       key: 'company_name' as const,
       header: 'Company',
       width: 'w-1/6',
+      sortable: true,
       render: (_: unknown, row: Contact) => row.company_name || '-',
     },
     {
       key: 'role' as const,
       header: 'Role',
       width: 'w-1/6',
+      sortable: true,
       render: (_: unknown, row: Contact) => row.role || '-',
     },
     {
@@ -236,7 +250,7 @@ export function ContactsPage() {
         row.email ? (
           <a
             href={`mailto:${row.email}`}
-            className="text-blue-600 hover:underline"
+            className="text-primary hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
             {row.email}
@@ -246,34 +260,53 @@ export function ContactsPage() {
         ),
     },
     {
-      key: 'linkedin' as const,
-      header: 'LinkedIn',
-      width: 'w-24',
+      key: 'phone' as const,
+      header: 'Phone',
+      width: 'w-1/6',
       render: (_: unknown, row: Contact) =>
-        row.linkedin ? (
+        row.phone ? (
           <a
-            href={row.linkedin.startsWith('http') ? row.linkedin : `https://${row.linkedin}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline"
+            href={`tel:${row.phone}`}
+            className="text-primary hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
-            Profile
+            {row.phone}
           </a>
         ) : (
           '-'
         ),
     },
     {
+      key: 'linkedin' as const,
+      header: '',
+      width: 'w-10',
+      render: (_: unknown, row: Contact) =>
+        row.linkedin ? (
+          <a
+            href={row.linkedin.startsWith('http') ? row.linkedin : `https://${row.linkedin}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-text-placeholder hover:text-primary transition-colors"
+            aria-label="Open LinkedIn profile"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
+        ) : null,
+    },
+    {
       key: 'id' as const,
-      header: 'Actions',
-      width: 'w-24',
+      header: '',
+      width: 'w-10',
       render: (_: unknown, row: Contact) => (
         <Button
-          variant="danger"
+          variant="ghost"
+          size="sm"
           onClick={(e: React.MouseEvent) => handleDeleteClick(row, e)}
+          aria-label={`Delete ${row.name}`}
+          className="text-text-placeholder hover:text-danger"
         >
-          Delete
+          <Trash2 className="w-4 h-4" />
         </Button>
       ),
     },
@@ -281,54 +314,64 @@ export function ContactsPage() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Page Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Manage your professional contacts
-          </p>
-        </div>
-        <Button onClick={handleOpenAddModal}>+ Add Contact</Button>
-      </div>
+      <PageHeader
+        title="Contacts"
+        subtitle="Manage your professional contacts"
+        action={<Button onClick={handleOpenAddModal} icon={<Plus className="w-4 h-4" />}>Add Contact</Button>}
+      />
 
       {/* Filters */}
-      <div className="mb-4 flex gap-4">
-        <div className="w-64">
+      <div className="flex flex-wrap items-end gap-3 mb-4">
+        <div className="flex-1 min-w-[200px]">
           <Input
             placeholder="Search contacts..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            startElement={<Search className="w-4 h-4" />}
+            aria-label="Search contacts"
           />
         </div>
-        <div className="w-64">
+        <div className="min-w-[180px]">
           <Select
             options={companyFilterOptions}
             value={filterCompanyId}
             onChange={(e) => setFilterCompanyId(e.target.value)}
+            aria-label="Filter by company"
           />
         </div>
       </div>
 
-      {/* Error State */}
-      {error && !isModalOpen && (
-        <div className="mb-4 bg-red-50 text-red-700 p-4 rounded-md">
-          {error}
-        </div>
-      )}
-
       {/* Contacts Table */}
       <div className="flex-1">
-        <Table
-          data={filteredContacts}
-          columns={columns}
-          onRowClick={handleOpenEditModal}
-          loading={loading}
-        />
-        {!loading && (
-          <div className="mt-3 text-xs text-gray-500 text-center">
-            {filteredContacts.length} of {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
-          </div>
+        {!loading && filteredContacts.length === 0 ? (
+          <EmptyState
+            icon={<Users className="w-12 h-12" />}
+            title={searchTerm || filterCompanyId ? 'No matching contacts' : 'No contacts yet'}
+            description={
+              searchTerm || filterCompanyId
+                ? 'Try a different search term or clear the filters.'
+                : 'Add your first professional contact to get started.'
+            }
+            action={
+              searchTerm || filterCompanyId
+                ? { label: 'Clear Filters', onClick: () => { setSearchTerm(''); setFilterCompanyId(''); } }
+                : { label: 'Add Contact', onClick: handleOpenAddModal }
+            }
+          />
+        ) : (
+          <>
+            <Table
+              data={filteredContacts}
+              columns={columns}
+              onRowClick={handleOpenEditModal}
+              loading={loading}
+            />
+            {!loading && (
+              <div className="mt-3 pt-3 border-t border-border text-xs text-text-muted text-center">
+                {filteredContacts.length} of {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -340,10 +383,8 @@ export function ContactsPage() {
       >
         <Form onSubmit={handleSubmit}>
           <div className="space-y-4">
-            {error && (
-              <div className="bg-red-50 text-red-700 p-3 rounded-md text-sm">
-                {error}
-              </div>
+            {formError && (
+              <Alert variant="danger">{formError}</Alert>
             )}
 
             <Input
@@ -376,6 +417,14 @@ export function ContactsPage() {
               value={formEmail}
               onChange={(e) => setFormEmail(e.target.value)}
               placeholder="john@example.com"
+            />
+
+            <Input
+              label="Phone"
+              type="tel"
+              value={formPhone}
+              onChange={(e) => setFormPhone(e.target.value)}
+              placeholder="+1 (555) 123-4567"
             />
 
             <Input
@@ -414,13 +463,14 @@ export function ContactsPage() {
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         title="Delete Contact"
+        size="sm"
       >
         <div className="space-y-4">
-          <p className="text-gray-700">
+          <p className="text-text-secondary">
             Are you sure you want to delete <strong>{contactToDelete?.name}</strong>?
           </p>
           {contactToDelete?.company_name && (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-text-muted">
               Contact at {contactToDelete.company_name}
             </p>
           )}

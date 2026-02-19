@@ -1,22 +1,39 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { Link, useSearchParams } from 'react-router-dom';
+import { CheckCircle } from 'lucide-react';
+import { authApi } from '@/api/auth';
 import { ROUTES } from '@/routes/routes';
-import { Input, Button, PasswordInput, Alert } from '@/components/common';
-import { OAuthButtons } from './OAuthButtons';
+import { Button, PasswordInput, Alert } from '@/components/common';
 
-export function RegisterPage() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+export function ResetPasswordPage() {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [confirmError, setConfirmError] = useState('');
+  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-  const { register } = useAuth();
-  const navigate = useNavigate();
+  // No token in URL
+  if (!token) {
+    return (
+      <div>
+        <h2 className="text-2xl font-bold text-text">Invalid reset link</h2>
+        <p className="mt-1 text-sm text-text-muted mb-6">
+          This password reset link is invalid or incomplete.
+        </p>
+        <Alert variant="danger" className="mb-6">
+          Please request a new password reset link.
+        </Alert>
+        <Link to={ROUTES.FORGOT_PASSWORD}>
+          <Button className="w-full">Request New Link</Button>
+        </Link>
+      </div>
+    );
+  }
 
   const validatePassword = () => {
     if (password && password.length < 8) {
@@ -51,21 +68,38 @@ export function RegisterPage() {
     setIsLoading(true);
 
     try {
-      await register({ email, password, name: name || undefined });
-      navigate(ROUTES.DASHBOARD, { replace: true });
+      await authApi.resetPassword(token, password);
+      setSuccess(true);
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Registration failed. Please try again.');
+      const apiError = err as { response?: { data?: { error?: string } } };
+      setError(apiError.response?.data?.error || 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (success) {
+    return (
+      <div className="text-center">
+        <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-success-light flex items-center justify-center">
+          <CheckCircle className="w-6 h-6 text-success" />
+        </div>
+        <h2 className="text-2xl font-bold text-text">Password reset</h2>
+        <p className="mt-1 text-sm text-text-muted mb-6">
+          Your password has been reset successfully.
+        </p>
+        <Link to={ROUTES.LOGIN}>
+          <Button className="w-full">Sign In</Button>
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <h2 className="text-2xl font-bold text-text">Create your account</h2>
+      <h2 className="text-2xl font-bold text-text">Set new password</h2>
       <p className="mt-1 text-sm text-text-muted mb-6">
-        Start organizing your job search in seconds
+        Choose a new password for your account.
       </p>
 
       {error && (
@@ -73,28 +107,8 @@ export function RegisterPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label="Name (optional)"
-          type="text"
-          value={name}
-          onChange={(e) => { setName(e.target.value); if (error) setError(''); }}
-          autoComplete="name"
-          placeholder="John Doe"
-          autoFocus
-        />
-
-        <Input
-          label="Email"
-          type="email"
-          value={email}
-          onChange={(e) => { setEmail(e.target.value); if (error) setError(''); }}
-          required
-          autoComplete="email"
-          placeholder="you@example.com"
-        />
-
         <PasswordInput
-          label="Password"
+          label="New Password"
           value={password}
           onChange={(e) => {
             setPassword(e.target.value);
@@ -106,6 +120,7 @@ export function RegisterPage() {
           placeholder="••••••••"
           helperText={passwordError ? undefined : 'Must be at least 8 characters'}
           error={passwordError}
+          autoFocus
         />
 
         <PasswordInput
@@ -123,11 +138,9 @@ export function RegisterPage() {
         />
 
         <Button type="submit" loading={isLoading} className="w-full">
-          Create Account
+          Reset Password
         </Button>
       </form>
-
-      <OAuthButtons />
     </div>
   );
 }
