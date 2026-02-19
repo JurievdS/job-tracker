@@ -20,6 +20,7 @@ export interface AuthContextType {
   register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
+  updateUser: (user: User) => void;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -96,6 +97,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * Update user state directly (e.g. after account settings change)
+   */
+  const updateUser = useCallback((userData: User) => {
+    setUser(userData);
+  }, []);
+
+  /**
    * Logout - invalidate tokens
    */
   const logout = useCallback(async () => {
@@ -121,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     register,
     logout,
     refreshAuth,
+    updateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

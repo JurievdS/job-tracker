@@ -1,77 +1,102 @@
-import { Outlet, NavLink } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useSidebarState } from '@/hooks/useSidebarState';
 import { ROUTES } from '@/routes/routes';
+import { ErrorBoundary } from '@/components/common';
+import { ThemeToggle } from '@/components/common/ThemeToggle';
+import { useTheme } from '@/contexts/ThemeContext';
+import { Sidebar } from './Sidebar';
 
 export function MainLayout() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { sidebarPosition } = useTheme();
 
-  const navItems = [
-    { path: ROUTES.DASHBOARD, label: 'Dashboard', icon: '📊' },
-    { path: ROUTES.APPLICATIONS, label: 'Applications', icon: '📝' },
-    { path: ROUTES.COMPANIES, label: 'Companies', icon: '🏢' },
-    { path: ROUTES.CONTACTS, label: 'Contacts', icon: '👥' },
-    { path: ROUTES.POSITIONS, label: 'Positions', icon: '💼' },
-    { path: ROUTES.INTERACTIONS, label: 'Interactions', icon: '💬' },
-    { path: ROUTES.REMINDERS, label: 'Reminders', icon: '⏰' },
-  ];
+  const {
+    isCollapsed,
+    isMobileOpen,
+    isMobile,
+    toggleCollapsed,
+    toggleMobile,
+    closeMobile,
+  } = useSidebarState();
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    closeMobile();
+  }, [location.pathname, closeMobile]);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate(ROUTES.LOGIN);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* ============================================
-          HEADER
-          ============================================ */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900">Job Tracker</h1>
+    <div className="min-h-screen bg-background">
+      {/* Skip-to-content link */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-[var(--radius-md)] focus:text-sm focus:font-medium"
+      >
+        Skip to content
+      </a>
 
-          {/* User info and logout */}
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">
-              {user?.email || user?.name || 'User'}
-            </span>
-            <button
-              onClick={logout}
-              className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-            >
-              Logout
-            </button>
-          </div>
+      {/* Mobile-only top bar */}
+      <header className="lg:hidden bg-surface border-b border-border relative z-30">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={toggleMobile}
+            className="p-1.5 rounded-[var(--radius-md)] text-text-muted hover:bg-surface-alt transition-colors"
+            aria-label="Open navigation"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <span className="text-lg font-bold text-text">
+            Job Tracker
+          </span>
+          <ThemeToggle />
         </div>
       </header>
 
-      <div className="flex">
-        {/* ============================================
-            SIDEBAR NAVIGATION
-            ============================================ */}
-        <nav className="w-64 bg-white shadow-sm min-h-[calc(100vh-64px)] p-4">
-          <ul className="space-y-1">
-            {navItems.map((item) => (
-              <li key={item.path}>
-                <NavLink
-                  to={item.path}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-4 py-2 rounded-md text-sm transition-colors ${
-                      isActive
-                        ? 'bg-blue-50 text-blue-700 font-medium'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`
-                  }
-                >
-                  <span>{item.icon}</span>
-                  <span>{item.label}</span>
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
+      <div className={`flex ${sidebarPosition === 'right' ? 'flex-row-reverse' : ''}`} inert={isMobile && isMobileOpen ? true : undefined}>
+        {/* Desktop sidebar */}
+        <div className="hidden lg:block">
+          <Sidebar
+            isCollapsed={isCollapsed}
+            isMobile={false}
+            isMobileOpen={false}
+            onToggleCollapsed={toggleCollapsed}
+            onCloseMobile={closeMobile}
+            onLogout={handleLogout}
+            user={user}
+          />
+        </div>
 
-        {/* ============================================
-            MAIN CONTENT AREA
-            ============================================ */}
-        <main className="flex-1 p-6">
-          <Outlet />
+        {/* Main content */}
+        <main id="main-content" className="flex-1 min-w-0 p-6">
+          <div className="max-w-7xl mx-auto">
+            <ErrorBoundary>
+              <Outlet />
+            </ErrorBoundary>
+          </div>
         </main>
       </div>
+
+      {/* Mobile sidebar (rendered outside flex to overlay) */}
+      {isMobile && (
+        <Sidebar
+          isCollapsed={false}
+          isMobile={true}
+          isMobileOpen={isMobileOpen}
+          onToggleCollapsed={toggleCollapsed}
+          onCloseMobile={closeMobile}
+          onLogout={handleLogout}
+          user={user}
+        />
+      )}
     </div>
   );
 }
