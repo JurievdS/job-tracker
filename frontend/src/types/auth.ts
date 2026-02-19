@@ -14,6 +14,9 @@ export interface User {
   name: string | null;
   avatar_url: string | null;
   created_at?: string;
+  has_password?: boolean;
+  google_connected?: boolean;
+  github_connected?: boolean;
 }
 
 export interface LoginCredentials {

@@ -3,6 +3,7 @@ import type {
   Company,
   CompanyWithNotes,
   CreateCompanyDto,
+  UpdateCompanyDto,
   UserCompanyNotes,
   UserCompanyNotesDto,
 } from "@/types/company";
@@ -18,8 +19,8 @@ export const companiesApi = {
    * List all companies
    * GET /companies
    */
-  list: async (): Promise<Company[]> => {
-    const response = await apiClient.get<Company[]>("/companies");
+  list: async (): Promise<CompanyWithNotes[]> => {
+    const response = await apiClient.get<CompanyWithNotes[]>("/companies");
     return response.data;
   },
 
@@ -50,6 +51,23 @@ export const companiesApi = {
   create: async (data: CreateCompanyDto): Promise<Company> => {
     const response = await apiClient.post<Company>("/companies", data);
     return response.data;
+  },
+
+  /**
+   * Update a company (global)
+   * PUT /companies/:id
+   */
+  update: async (id: number, data: UpdateCompanyDto): Promise<Company> => {
+    const response = await apiClient.put<Company>(`/companies/${id}`, data);
+    return response.data;
+  },
+
+  /**
+   * Delete a company (global)
+   * DELETE /companies/:id
+   */
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/companies/${id}`);
   },
 
   // ==================== User Notes ====================

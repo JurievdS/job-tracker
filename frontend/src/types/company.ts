@@ -7,6 +7,7 @@ export interface Company {
   name: string;
   website?: string;
   location?: string;
+  industry?: string;
   created_at: string;
 }
 
@@ -25,7 +26,13 @@ export interface CreateCompanyDto {
   name: string;
   website?: string;
   location?: string;
+  industry?: string;
 }
+
+/**
+ * Payload for updating a company
+ */
+export type UpdateCompanyDto = Partial<CreateCompanyDto>;
 
 /**
  * Payload for setting user's notes on a company

@@ -75,10 +75,12 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Don't retry if already retried or if it's the refresh endpoint
+    // Don't retry if already retried or if it's an auth endpoint
     if (
       originalRequest._retry ||
-      originalRequest.url?.includes('/auth/refresh')
+      originalRequest.url?.includes('/auth/refresh') ||
+      originalRequest.url?.includes('/auth/login') ||
+      originalRequest.url?.includes('/auth/register')
     ) {
       return Promise.reject(error);
     }

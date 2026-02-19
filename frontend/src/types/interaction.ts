@@ -1,10 +1,13 @@
 export type InteractionType = 'email' | 'phone_call' | 'in_person' | 'video_call' | 'other';
 
+export type InteractionDirection = 'inbound' | 'outbound';
+
 export interface Interaction {
   id: number;
   application_id: number | null;
   contact_id: number | null;
   interaction_type: string;
+  direction: InteractionDirection | null;
   interaction_date: string | null;
   notes: string | null;
   created_at: string;
@@ -12,7 +15,7 @@ export interface Interaction {
 
 export interface InteractionWithDetails extends Interaction {
   contact_name: string | null;
-  position_title: string;
+  job_title: string;
   company_name: string;
 }
 

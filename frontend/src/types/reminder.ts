@@ -8,7 +8,7 @@ export interface Reminder {
 }
 
 export interface ReminderWithDetails extends Reminder {
-  position_title: string;
+  job_title: string;
   company_name: string;
 }
 
