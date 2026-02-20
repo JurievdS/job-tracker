@@ -11,18 +11,25 @@ import type { Contact } from '@/types/contact';
 import { interactionsApi } from '@/api/interactions';
 import { applicationsApi } from '@/api/applications';
 import { contactsApi } from '@/api/contacts';
-import { Button, Input, Textarea, Select, Modal, Form, Table, Badge } from '@/components/common';
+import { useToast } from '@/contexts/ToastContext';
+import { parseApiError } from '@/utils/errors';
+import { formatDate } from '@/utils/date';
+import { Search, Plus, Trash2, MessageSquare } from 'lucide-react';
+import { Button, Input, Textarea, Select, Modal, Form, Table, Badge, PageHeader, EmptyState, Alert, DateInput } from '@/components/common';
 
 export function InteractionsPage() {
+  const { addToast } = useToast();
+
   // Data state
   const [interactions, setInteractions] = useState<InteractionWithDetails[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Filter state
   const [filterApplicationId, setFilterApplicationId] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -46,7 +53,7 @@ export function InteractionsPage() {
       const data = await interactionsApi.list(applicationId);
       setInteractions(data);
     } catch (err) {
-      setError('Failed to fetch interactions');
+      addToast('Failed to fetch interactions', 'error');
       console.error('Failed to fetch interactions', err);
     }
   };
@@ -54,7 +61,6 @@ export function InteractionsPage() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      setError(null);
       try {
         const [interactionsData, applicationsData, contactsData] = await Promise.all([
           interactionsApi.list(),
@@ -65,7 +71,7 @@ export function InteractionsPage() {
         setApplications(applicationsData);
         setContacts(contactsData);
       } catch (err) {
-        setError('Failed to fetch data');
+        addToast('Failed to fetch data', 'error');
         console.error('Failed to fetch data', err);
       } finally {
         setLoading(false);
@@ -87,7 +93,7 @@ export function InteractionsPage() {
       { value: '', label: 'All Applications' },
       ...applications.map((a) => ({
         value: String(a.id),
-        label: `${a.position_title} at ${a.company_name}`,
+        label: `${a.job_title} at ${a.company_name}`,
       })),
     ];
   }, [applications]);
@@ -97,7 +103,7 @@ export function InteractionsPage() {
       { value: '', label: 'Select an application...' },
       ...applications.map((a) => ({
         value: String(a.id),
-        label: `${a.position_title} at ${a.company_name}`,
+        label: `${a.job_title} at ${a.company_name}`,
       })),
     ];
   }, [applications]);
@@ -119,10 +125,18 @@ export function InteractionsPage() {
     }));
   }, []);
 
-  const formatDate = (dateStr: string | null): string => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString();
-  };
+  // Client-side search filtering
+  const filteredInteractions = useMemo(() => {
+    if (!searchTerm.trim()) return interactions;
+    const term = searchTerm.toLowerCase();
+    return interactions.filter(
+      (i) =>
+        i.notes?.toLowerCase().includes(term) ||
+        i.contact_name?.toLowerCase().includes(term) ||
+        i.job_title.toLowerCase().includes(term) ||
+        i.company_name.toLowerCase().includes(term)
+    );
+  }, [interactions, searchTerm]);
 
   const getTypeLabel = (type: string): string => {
     const found = INTERACTION_TYPES.find((t) => t.value === type);
@@ -150,7 +164,7 @@ export function InteractionsPage() {
     setFormType('email');
     setFormDate('');
     setFormNotes('');
-    setError(null);
+    setFormError(null);
   };
 
   const handleOpenAddModal = () => {
@@ -166,7 +180,7 @@ export function InteractionsPage() {
     setFormType(interaction.interaction_type);
     setFormDate(interaction.interaction_date || '');
     setFormNotes(interaction.notes || '');
-    setError(null);
+    setFormError(null);
     setIsModalOpen(true);
   };
 
@@ -180,17 +194,17 @@ export function InteractionsPage() {
     e.preventDefault();
 
     if (!formApplicationId) {
-      setError('Please select an application');
+      setFormError('Please select an application');
       return;
     }
 
     if (!formDate) {
-      setError('Please select a date');
+      setFormError('Please select a date');
       return;
     }
 
     setIsSubmitting(true);
-    setError(null);
+    setFormError(null);
 
     try {
       if (editingInteraction) {
@@ -215,11 +229,11 @@ export function InteractionsPage() {
         await interactionsApi.create(createData);
       }
 
+      addToast(editingInteraction ? 'Interaction updated' : 'Interaction created', 'success');
       await fetchInteractions();
       handleCloseModal();
     } catch (err) {
-      setError(editingInteraction ? 'Failed to update interaction' : 'Failed to create interaction');
-      console.error('Submit error', err);
+      setFormError(parseApiError(err, editingInteraction ? 'Failed to update interaction' : 'Failed to create interaction'));
     } finally {
       setIsSubmitting(false);
     }
@@ -240,8 +254,9 @@ export function InteractionsPage() {
       setInteractions((prev) => prev.filter((i) => i.id !== interactionToDelete.id));
       setIsDeleteModalOpen(false);
       setInteractionToDelete(null);
+      addToast('Interaction deleted', 'success');
     } catch (err) {
-      setError('Failed to delete interaction');
+      addToast('Failed to delete interaction', 'error');
       console.error('Delete error', err);
     } finally {
       setIsSubmitting(false);
@@ -253,48 +268,55 @@ export function InteractionsPage() {
       key: 'interaction_type' as const,
       header: 'Type',
       width: 'w-28',
-      render: (value: string) => (
-        <Badge variant={getTypeBadgeVariant(value)}>{getTypeLabel(value)}</Badge>
+      sortable: true,
+      render: (_value: unknown, row: InteractionWithDetails) => (
+        <Badge variant={getTypeBadgeVariant(row.interaction_type)}>{getTypeLabel(row.interaction_type)}</Badge>
       ),
     },
     {
       key: 'interaction_date' as const,
       header: 'Date',
       width: 'w-28',
-      render: (value: string | null) => formatDate(value),
+      sortable: true,
+      render: (_value: unknown, row: InteractionWithDetails) => formatDate(row.interaction_date) || '-',
     },
     {
-      key: 'position_title' as const,
+      key: 'job_title' as const,
       header: 'Position',
       width: 'w-1/5',
+      sortable: true,
     },
     {
       key: 'company_name' as const,
       header: 'Company',
       width: 'w-1/6',
+      sortable: true,
     },
     {
       key: 'contact_name' as const,
       header: 'Contact',
       width: 'w-1/6',
-      render: (value: string | null) => value || '-',
+      render: (_value: unknown, row: InteractionWithDetails) => row.contact_name || '-',
     },
     {
       key: 'notes' as const,
       header: 'Notes',
-      render: (value: string | null) =>
-        value ? (value.length > 50 ? value.substring(0, 50) + '...' : value) : '-',
+      render: (_value: unknown, row: InteractionWithDetails) =>
+        row.notes ? (row.notes.length > 50 ? row.notes.substring(0, 50) + '...' : row.notes) : '-',
     },
     {
       key: 'id' as const,
-      header: 'Actions',
-      width: 'w-24',
-      render: (_: number, row: InteractionWithDetails) => (
+      header: '',
+      width: 'w-10',
+      render: (_value: unknown, row: InteractionWithDetails) => (
         <Button
-          variant="danger"
+          variant="ghost"
+          size="sm"
           onClick={(e: React.MouseEvent) => handleDeleteClick(row, e)}
+          aria-label={`Delete ${getTypeLabel(row.interaction_type)} interaction`}
+          className="text-text-placeholder hover:text-danger"
         >
-          Delete
+          <Trash2 className="w-4 h-4" />
         </Button>
       ),
     },
@@ -302,46 +324,64 @@ export function InteractionsPage() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Page Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Interactions</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Track your communications with contacts and companies
-          </p>
-        </div>
-        <Button onClick={handleOpenAddModal}>+ Add Interaction</Button>
-      </div>
+      <PageHeader
+        title="Interactions"
+        subtitle="Track your communications with contacts and companies"
+        action={<Button onClick={handleOpenAddModal} icon={<Plus className="w-4 h-4" />}>Add Interaction</Button>}
+      />
 
-      {/* Filter */}
-      <div className="mb-4 max-w-md">
-        <Select
-          label="Filter by Application"
-          options={applicationFilterOptions}
-          value={filterApplicationId}
-          onChange={(e) => setFilterApplicationId(e.target.value)}
-        />
-      </div>
-
-      {/* Error State */}
-      {error && !isModalOpen && (
-        <div className="mb-4 bg-red-50 text-red-700 p-4 rounded-md">
-          {error}
+      {/* Filters */}
+      <div className="flex flex-wrap items-end gap-3 mb-4">
+        <div className="flex-1 min-w-[200px]">
+          <Input
+            placeholder="Search interactions..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            startElement={<Search className="w-4 h-4" />}
+            aria-label="Search interactions"
+          />
         </div>
-      )}
+        <div className="min-w-[180px]">
+          <Select
+            options={applicationFilterOptions}
+            value={filterApplicationId}
+            onChange={(e) => setFilterApplicationId(e.target.value)}
+            aria-label="Filter by application"
+          />
+        </div>
+      </div>
 
       {/* Interactions Table */}
       <div className="flex-1">
-        <Table
-          data={interactions}
-          columns={columns}
-          onRowClick={handleOpenEditModal}
-          loading={loading}
-        />
-        {!loading && (
-          <div className="mt-3 text-xs text-gray-500 text-center">
-            {interactions.length} interaction{interactions.length !== 1 ? 's' : ''}
-          </div>
+        {!loading && filteredInteractions.length === 0 ? (
+          <EmptyState
+            icon={<MessageSquare className="w-12 h-12" />}
+            title={searchTerm || filterApplicationId ? 'No matching interactions' : 'No interactions yet'}
+            description={
+              searchTerm || filterApplicationId
+                ? 'Try a different search term or clear the filters.'
+                : 'Start logging your communications by adding an interaction.'
+            }
+            action={
+              searchTerm || filterApplicationId
+                ? { label: 'Clear Filters', onClick: () => { setSearchTerm(''); setFilterApplicationId(''); } }
+                : { label: 'Add Interaction', onClick: handleOpenAddModal }
+            }
+          />
+        ) : (
+          <>
+            <Table
+              data={filteredInteractions}
+              columns={columns}
+              onRowClick={handleOpenEditModal}
+              loading={loading}
+            />
+            {!loading && (
+              <div className="mt-3 pt-3 border-t border-border text-xs text-text-muted text-center">
+                {filteredInteractions.length} of {interactions.length} interaction{interactions.length !== 1 ? 's' : ''}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -353,10 +393,8 @@ export function InteractionsPage() {
       >
         <Form onSubmit={handleSubmit}>
           <div className="space-y-4">
-            {error && (
-              <div className="bg-red-50 text-red-700 p-3 rounded-md text-sm">
-                {error}
-              </div>
+            {formError && (
+              <Alert variant="danger">{formError}</Alert>
             )}
 
             <Select
@@ -382,11 +420,11 @@ export function InteractionsPage() {
               required
             />
 
-            <Input
+            <DateInput
               label="Date"
-              type="date"
               value={formDate}
               onChange={(e) => setFormDate(e.target.value)}
+              showRelative
               required
             />
 
@@ -419,19 +457,20 @@ export function InteractionsPage() {
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         title="Delete Interaction"
+        size="sm"
       >
         <div className="space-y-4">
-          <p className="text-gray-700">
+          <p className="text-text-secondary">
             Are you sure you want to delete this interaction?
           </p>
           {interactionToDelete && (
-            <div className="bg-gray-50 p-3 rounded-md text-sm">
-              <p className="font-medium">
+            <div className="bg-surface-alt p-3 rounded-[var(--radius-md)] text-sm">
+              <p className="font-medium text-text">
                 {getTypeLabel(interactionToDelete.interaction_type)} on{' '}
-                {formatDate(interactionToDelete.interaction_date)}
+                {formatDate(interactionToDelete.interaction_date) || '-'}
               </p>
-              <p className="text-gray-500 mt-1">
-                {interactionToDelete.position_title} at {interactionToDelete.company_name}
+              <p className="text-text-muted mt-1">
+                {interactionToDelete.job_title} at {interactionToDelete.company_name}
               </p>
             </div>
           )}

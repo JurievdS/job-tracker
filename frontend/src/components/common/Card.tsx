@@ -32,8 +32,8 @@ export function Card({ title, children, className = '', onClick }: CardProps) {
   return (
     <div
       className={`
-        bg-white rounded-lg shadow-sm border border-gray-200 p-4
-        ${isClickable ? 'cursor-pointer hover:shadow-md hover:border-gray-300 transition-all' : ''}
+        bg-surface rounded-[var(--radius-lg)] shadow-sm border border-border p-[var(--padding-card)] transition-all duration-150
+        ${isClickable ? 'cursor-pointer hover:shadow-md hover:border-border-hover' : ''}
         ${className}
       `}
       onClick={onClick}
@@ -51,7 +51,7 @@ export function Card({ title, children, className = '', onClick }: CardProps) {
       }
     >
       {title && (
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">{title}</h3>
+        <h3 className="text-lg font-semibold text-text mb-3">{title}</h3>
       )}
       {children}
     </div>

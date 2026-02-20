@@ -30,15 +30,16 @@ export function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
+      aria-label={`${label} column, ${applications.length} application${applications.length !== 1 ? 's' : ''}`}
       className={`
-        flex flex-col bg-gray-50 rounded-lg p-3 min-h-[500px] w-64 flex-shrink-0
+        flex flex-col bg-surface-alt rounded-[var(--radius-lg)] p-3 min-h-[200px] w-64 flex-shrink-0 max-md:w-full max-md:min-h-0
         transition-all duration-200
-        ${isOver ? 'ring-2 ring-blue-400 bg-blue-50' : ''}
+        ${isOver ? 'ring-2 ring-primary bg-primary-light' : ''}
       `}
     >
       {/* Column Header */}
-      <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200">
-        <h3 className="font-medium text-gray-700 text-sm">
+      <div className="flex items-center justify-between mb-3 pb-2 border-b border-border">
+        <h3 className="font-medium text-text-secondary text-sm">
           {label}
         </h3>
         <Badge variant={STATUS_VARIANTS[status] || 'default'}>
@@ -57,7 +58,7 @@ export function KanbanColumn({
         ))}
 
         {applications.length === 0 && (
-          <div className="flex items-center justify-center h-24 text-gray-400 text-sm">
+          <div className="flex items-center justify-center h-24 text-text-placeholder text-sm">
             No applications
           </div>
         )}

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../middleware/errorHandler.js";
+import { authenticate } from "../middleware/auth.js";
 import { CompanyController } from "../controllers/CompanyController.js";
 import { CompanyService } from "../services/CompanyService.js";
 
@@ -62,7 +63,7 @@ const controller = new CompanyController(companyService);
  *       200:
  *         description: List of companies
  */
-router.get("/", asyncHandler(controller.list));
+router.get("/", authenticate, asyncHandler(controller.list));
 
 /**
  * @swagger
@@ -80,7 +81,7 @@ router.get("/", asyncHandler(controller.list));
  *       200:
  *         description: List of matching companies
  */
-router.get("/search", asyncHandler(controller.search));
+router.get("/search", authenticate, asyncHandler(controller.search));
 
 /**
  * @swagger
@@ -101,7 +102,7 @@ router.get("/search", asyncHandler(controller.search));
  *       404:
  *         description: Company not found
  */
-router.get("/:id", asyncHandler(controller.getById));
+router.get("/:id", authenticate, asyncHandler(controller.getById));
 
 /**
  * @swagger
@@ -129,7 +130,66 @@ router.get("/:id", asyncHandler(controller.getById));
  *       201:
  *         description: Company created
  */
-router.post("/", asyncHandler(controller.create));
+router.post("/", authenticate, asyncHandler(controller.create));
+
+/**
+ * @swagger
+ * /companies/{id}:
+ *   put:
+ *     summary: Update a company
+ *     description: Updates a global company. Changes affect all users.
+ *     tags: [Companies]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               website:
+ *                 type: string
+ *               location:
+ *                 type: string
+ *               industry:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Company updated
+ *       404:
+ *         description: Company not found
+ *       409:
+ *         description: Company name conflict
+ */
+router.put("/:id", authenticate, asyncHandler(controller.update));
+
+/**
+ * @swagger
+ * /companies/{id}:
+ *   delete:
+ *     summary: Delete a company
+ *     description: Deletes a global company. Linked applications and contacts will have their company reference set to null.
+ *     tags: [Companies]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       204:
+ *         description: Company deleted
+ *       404:
+ *         description: Company not found
+ */
+router.delete("/:id", authenticate, asyncHandler(controller.delete));
 
 /**
  * @swagger
@@ -147,7 +207,7 @@ router.post("/", asyncHandler(controller.create));
  *       200:
  *         description: User's notes for the company
  */
-router.get("/:id/notes", asyncHandler(controller.getUserNotes));
+router.get("/:id/notes", authenticate, asyncHandler(controller.getUserNotes));
 
 /**
  * @swagger
@@ -173,7 +233,7 @@ router.get("/:id/notes", asyncHandler(controller.getUserNotes));
  *       404:
  *         description: Company not found
  */
-router.put("/:id/notes", asyncHandler(controller.setUserNotes));
+router.put("/:id/notes", authenticate, asyncHandler(controller.setUserNotes));
 
 /**
  * @swagger
@@ -191,6 +251,6 @@ router.put("/:id/notes", asyncHandler(controller.setUserNotes));
  *       204:
  *         description: Notes deleted
  */
-router.delete("/:id/notes", asyncHandler(controller.deleteUserNotes));
+router.delete("/:id/notes", authenticate, asyncHandler(controller.deleteUserNotes));
 
 export default router;

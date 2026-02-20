@@ -3,17 +3,24 @@ import type { ReminderWithDetails, CreateReminderDto } from '@/types/reminder';
 import type { Application } from '@/types/application';
 import { remindersApi } from '@/api/reminders';
 import { applicationsApi } from '@/api/applications';
-import { Button, Input, Textarea, Select, Modal, Form, Table, Badge } from '@/components/common';
+import { useToast } from '@/contexts/ToastContext';
+import { parseApiError } from '@/utils/errors';
+import { formatDate } from '@/utils/date';
+import { Search, Plus, Trash2, Check, Bell } from 'lucide-react';
+import { Button, Input, Textarea, Select, Modal, Form, Table, Badge, PageHeader, EmptyState, Alert, DateInput, Tooltip } from '@/components/common';
 
 export function RemindersPage() {
+  const { addToast } = useToast();
+
   // Reminders list state
   const [reminders, setReminders] = useState<ReminderWithDetails[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Filter state
   const [showPendingOnly, setShowPendingOnly] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -33,7 +40,7 @@ export function RemindersPage() {
       const data = await remindersApi.list(showPendingOnly ? true : undefined);
       setReminders(data);
     } catch (err) {
-      setError('Failed to fetch reminders');
+      addToast('Failed to fetch reminders', 'error');
       console.error('Failed to fetch reminders', err);
     }
   };
@@ -41,7 +48,6 @@ export function RemindersPage() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      setError(null);
       try {
         const [remindersData, applicationsData] = await Promise.all([
           remindersApi.list(showPendingOnly ? true : undefined),
@@ -50,7 +56,7 @@ export function RemindersPage() {
         setReminders(remindersData);
         setApplications(applicationsData);
       } catch (err) {
-        setError('Failed to fetch data');
+        addToast('Failed to fetch data', 'error');
         console.error('Failed to fetch data', err);
       } finally {
         setLoading(false);
@@ -72,7 +78,7 @@ export function RemindersPage() {
       { value: '', label: 'Select an application...' },
       ...applications.map((a) => ({
         value: String(a.id),
-        label: `${a.position_title} at ${a.company_name}`,
+        label: `${a.job_title} at ${a.company_name}`,
       })),
     ];
   }, [applications]);
@@ -85,16 +91,23 @@ export function RemindersPage() {
     return reminderDate < today;
   };
 
-  const formatDate = (dateStr: string | null): string => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString();
-  };
+  // Client-side search filtering
+  const filteredReminders = useMemo(() => {
+    if (!searchTerm.trim()) return reminders;
+    const term = searchTerm.toLowerCase();
+    return reminders.filter(
+      (r) =>
+        r.message?.toLowerCase().includes(term) ||
+        r.job_title.toLowerCase().includes(term) ||
+        r.company_name.toLowerCase().includes(term)
+    );
+  }, [reminders, searchTerm]);
 
   const resetForm = () => {
     setFormApplicationId('');
     setFormDate('');
     setFormMessage('');
-    setError(null);
+    setFormError(null);
   };
 
   const handleOpenAddModal = () => {
@@ -111,22 +124,22 @@ export function RemindersPage() {
     e.preventDefault();
 
     if (!formApplicationId) {
-      setError('Please select an application');
+      setFormError('Please select an application');
       return;
     }
 
     if (!formDate) {
-      setError('Please select a date');
+      setFormError('Please select a date');
       return;
     }
 
     if (!formMessage.trim()) {
-      setError('Please enter a message');
+      setFormError('Please enter a message');
       return;
     }
 
     setIsSubmitting(true);
-    setError(null);
+    setFormError(null);
 
     try {
       const createData: CreateReminderDto = {
@@ -137,12 +150,11 @@ export function RemindersPage() {
 
       await remindersApi.create(createData);
 
-      // Refetch to get the new reminder with details
+      addToast('Reminder created', 'success');
       await fetchReminders();
       handleCloseModal();
     } catch (err) {
-      setError('Failed to create reminder');
-      console.error('Submit error', err);
+      setFormError(parseApiError(err, 'Failed to create reminder'));
     } finally {
       setIsSubmitting(false);
     }
@@ -152,12 +164,12 @@ export function RemindersPage() {
     e.stopPropagation();
     try {
       await remindersApi.markComplete(reminder.id);
-      // Update local state
       setReminders((prev) =>
         prev.map((r) => (r.id === reminder.id ? { ...r, completed: true } : r))
       );
+      addToast('Reminder completed', 'success');
     } catch (err) {
-      setError('Failed to mark reminder as complete');
+      addToast('Failed to mark reminder as complete', 'error');
       console.error('Complete error', err);
     }
   };
@@ -177,8 +189,9 @@ export function RemindersPage() {
       setReminders((prev) => prev.filter((r) => r.id !== reminderToDelete.id));
       setIsDeleteModalOpen(false);
       setReminderToDelete(null);
+      addToast('Reminder deleted', 'success');
     } catch (err) {
-      setError('Failed to delete reminder');
+      addToast('Failed to delete reminder', 'error');
       console.error('Delete error', err);
     } finally {
       setIsSubmitting(false);
@@ -190,25 +203,33 @@ export function RemindersPage() {
       key: 'message' as const,
       header: 'Message',
       width: 'w-1/3',
-      render: (value: string | null) => value || '-',
+      sortable: true,
+      render: (_value: unknown, row: ReminderWithDetails) => (
+        <span className={row.completed ? 'text-text-muted line-through' : ''}>
+          {row.message ? (row.message.length > 60 ? row.message.substring(0, 60) + '...' : row.message) : '-'}
+        </span>
+      ),
     },
     {
-      key: 'position_title' as const,
+      key: 'job_title' as const,
       header: 'Position',
       width: 'w-1/5',
+      sortable: true,
     },
     {
       key: 'company_name' as const,
       header: 'Company',
       width: 'w-1/6',
+      sortable: true,
     },
     {
       key: 'reminder_date' as const,
       header: 'Date',
-      width: 'w-24',
-      render: (value: string | null, row: ReminderWithDetails) => (
-        <span className={isOverdue(row) ? 'text-red-600 font-medium' : ''}>
-          {formatDate(value)}
+      width: 'w-28',
+      sortable: true,
+      render: (_value: unknown, row: ReminderWithDetails) => (
+        <span className={isOverdue(row) ? 'text-danger font-medium' : ''}>
+          {formatDate(row.reminder_date) || '-'}
         </span>
       ),
     },
@@ -216,8 +237,8 @@ export function RemindersPage() {
       key: 'completed' as const,
       header: 'Status',
       width: 'w-24',
-      render: (value: boolean | null, row: ReminderWithDetails) => {
-        if (value) {
+      render: (_value: unknown, row: ReminderWithDetails) => {
+        if (row.completed) {
           return <Badge variant="success">Completed</Badge>;
         }
         if (isOverdue(row)) {
@@ -228,24 +249,34 @@ export function RemindersPage() {
     },
     {
       key: 'id' as const,
-      header: 'Actions',
-      width: 'w-40',
-      render: (_: number, row: ReminderWithDetails) => (
-        <div className="flex gap-2">
+      header: '',
+      width: 'w-20',
+      render: (_value: unknown, row: ReminderWithDetails) => (
+        <div className="flex gap-1">
           {!row.completed && (
-            <Button
-              variant="secondary"
-              onClick={(e: React.MouseEvent) => handleMarkComplete(row, e)}
-            >
-              Complete
-            </Button>
+            <Tooltip content="Mark complete">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e: React.MouseEvent) => handleMarkComplete(row, e)}
+                aria-label="Mark as complete"
+                className="text-text-placeholder hover:text-success"
+              >
+                <Check className="w-4 h-4" />
+              </Button>
+            </Tooltip>
           )}
-          <Button
-            variant="danger"
-            onClick={(e: React.MouseEvent) => handleDeleteClick(row, e)}
-          >
-            Delete
-          </Button>
+          <Tooltip content="Delete">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e: React.MouseEvent) => handleDeleteClick(row, e)}
+              aria-label="Delete reminder"
+              className="text-text-placeholder hover:text-danger"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </Tooltip>
         </div>
       ),
     },
@@ -253,48 +284,64 @@ export function RemindersPage() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Page Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reminders</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Track follow-ups and important dates for your applications
-          </p>
-        </div>
-        <Button onClick={handleOpenAddModal}>+ Add Reminder</Button>
-      </div>
+      <PageHeader
+        title="Reminders"
+        subtitle="Track follow-ups and important dates for your applications"
+        action={<Button onClick={handleOpenAddModal} icon={<Plus className="w-4 h-4" />}>Add Reminder</Button>}
+      />
 
-      {/* Filter */}
-      <div className="mb-4">
-        <label className="flex items-center gap-2 cursor-pointer">
+      {/* Filters */}
+      <div className="flex flex-wrap items-end gap-3 mb-4">
+        <div className="flex-1 min-w-[200px]">
+          <Input
+            placeholder="Search reminders..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            startElement={<Search className="w-4 h-4" />}
+            aria-label="Search reminders"
+          />
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer px-2">
           <input
             type="checkbox"
             checked={showPendingOnly}
             onChange={(e) => setShowPendingOnly(e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="rounded border-border text-primary focus:ring-primary"
           />
-          <span className="text-sm text-gray-700">Show pending only</span>
+          <span className="text-sm text-text-secondary whitespace-nowrap">Pending only</span>
         </label>
       </div>
 
-      {/* Error State */}
-      {error && !isModalOpen && (
-        <div className="mb-4 bg-red-50 text-red-700 p-4 rounded-md">
-          {error}
-        </div>
-      )}
-
       {/* Reminders Table */}
       <div className="flex-1">
-        <Table
-          data={reminders}
-          columns={columns}
-          loading={loading}
-        />
-        {!loading && (
-          <div className="mt-3 text-xs text-gray-500 text-center">
-            {reminders.length} reminder{reminders.length !== 1 ? 's' : ''}
-          </div>
+        {!loading && filteredReminders.length === 0 ? (
+          <EmptyState
+            icon={<Bell className="w-12 h-12" />}
+            title={searchTerm || showPendingOnly ? 'No matching reminders' : 'No reminders yet'}
+            description={
+              searchTerm || showPendingOnly
+                ? 'Try a different search term or clear the filters.'
+                : 'Create a reminder to track follow-ups for your applications.'
+            }
+            action={
+              searchTerm || showPendingOnly
+                ? { label: 'Clear Filters', onClick: () => { setSearchTerm(''); setShowPendingOnly(false); } }
+                : { label: 'Add Reminder', onClick: handleOpenAddModal }
+            }
+          />
+        ) : (
+          <>
+            <Table
+              data={filteredReminders}
+              columns={columns}
+              loading={loading}
+            />
+            {!loading && (
+              <div className="mt-3 pt-3 border-t border-border text-xs text-text-muted text-center">
+                {filteredReminders.length} of {reminders.length} reminder{reminders.length !== 1 ? 's' : ''}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -306,10 +353,8 @@ export function RemindersPage() {
       >
         <Form onSubmit={handleSubmit}>
           <div className="space-y-4">
-            {error && (
-              <div className="bg-red-50 text-red-700 p-3 rounded-md text-sm">
-                {error}
-              </div>
+            {formError && (
+              <Alert variant="danger">{formError}</Alert>
             )}
 
             <Select
@@ -320,11 +365,12 @@ export function RemindersPage() {
               required
             />
 
-            <Input
+            <DateInput
               label="Reminder Date"
-              type="date"
               value={formDate}
               onChange={(e) => setFormDate(e.target.value)}
+              showRelative
+              warnPast
               required
             />
 
@@ -358,16 +404,17 @@ export function RemindersPage() {
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         title="Delete Reminder"
+        size="sm"
       >
         <div className="space-y-4">
-          <p className="text-gray-700">
+          <p className="text-text-secondary">
             Are you sure you want to delete this reminder?
           </p>
           {reminderToDelete && (
-            <div className="bg-gray-50 p-3 rounded-md text-sm">
-              <p className="font-medium">{reminderToDelete.message}</p>
-              <p className="text-gray-500 mt-1">
-                {reminderToDelete.position_title} at {reminderToDelete.company_name}
+            <div className="bg-surface-alt p-3 rounded-[var(--radius-md)] text-sm">
+              <p className="font-medium text-text">{reminderToDelete.message}</p>
+              <p className="text-text-muted mt-1">
+                {reminderToDelete.job_title} at {reminderToDelete.company_name}
               </p>
             </div>
           )}

@@ -3,7 +3,6 @@ import {
   interactions,
   applications,
   contacts,
-  positions,
   companies,
 } from "../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
@@ -19,12 +18,13 @@ export interface InteractionWithDetails {
   application_id: number | null;
   contact_id: number | null;
   interaction_type: string;
+  direction: string | null;
   interaction_date: string | null;
   notes: string | null;
   created_at: Date | null;
   contact_name: string | null;
-  position_title: string;
-  company_name: string;
+  job_title: string;
+  company_name: string | null;
 }
 
 /**
@@ -34,9 +34,6 @@ export class InteractionService {
 
   /**
    * Get all interactions for a user with optional application filter
-   * @param userId ID of the user
-   * @param applicationId Optional ID of the application to filter by
-   * @return List of interactions with related details
    */
   async findAll(
     userId: number,
@@ -48,18 +45,18 @@ export class InteractionService {
         application_id: interactions.application_id,
         contact_id: interactions.contact_id,
         interaction_type: interactions.interaction_type,
+        direction: interactions.direction,
         interaction_date: interactions.interaction_date,
         notes: interactions.notes,
         created_at: interactions.created_at,
         contact_name: contacts.name,
-        position_title: positions.title,
+        job_title: applications.job_title,
         company_name: companies.name,
       })
       .from(interactions)
       .leftJoin(contacts, eq(interactions.contact_id, contacts.id))
       .innerJoin(applications, eq(interactions.application_id, applications.id))
-      .innerJoin(positions, eq(applications.position_id, positions.id))
-      .innerJoin(companies, eq(positions.company_id, companies.id))
+      .leftJoin(companies, eq(applications.company_id, companies.id))
       .orderBy(desc(interactions.interaction_date));
 
     if (applicationId) {
@@ -76,10 +73,6 @@ export class InteractionService {
 
   /**
    * Get an interaction by ID with related details
-   * @param interactionId ID of the interaction
-   * @param userId ID of the user
-   * @return Interaction with related details
-   * @throws NotFoundError if interaction doesn't exist or doesn't belong to user
    */
   async findByIdWithDetails(
     interactionId: number,
@@ -91,18 +84,18 @@ export class InteractionService {
         application_id: interactions.application_id,
         contact_id: interactions.contact_id,
         interaction_type: interactions.interaction_type,
+        direction: interactions.direction,
         interaction_date: interactions.interaction_date,
         notes: interactions.notes,
         created_at: interactions.created_at,
         contact_name: contacts.name,
-        position_title: positions.title,
+        job_title: applications.job_title,
         company_name: companies.name,
       })
       .from(interactions)
       .leftJoin(contacts, eq(interactions.contact_id, contacts.id))
       .innerJoin(applications, eq(interactions.application_id, applications.id))
-      .innerJoin(positions, eq(applications.position_id, positions.id))
-      .innerJoin(companies, eq(positions.company_id, companies.id))
+      .leftJoin(companies, eq(applications.company_id, companies.id))
       .where(
         and(eq(interactions.id, interactionId), eq(applications.user_id, userId))
       );
@@ -116,10 +109,6 @@ export class InteractionService {
 
   /**
    * Get an interaction by ID (verifies ownership via application)
-   * @param interactionId ID of the interaction
-   * @param userId ID of the user
-   * @return Interaction
-   * @throws NotFoundError if interaction doesn't exist or doesn't belong to user
    */
   async findByIdOrThrow(interactionId: number, userId: number): Promise<Interaction> {
     const result = await db
@@ -128,6 +117,7 @@ export class InteractionService {
         application_id: interactions.application_id,
         contact_id: interactions.contact_id,
         interaction_type: interactions.interaction_type,
+        direction: interactions.direction,
         interaction_date: interactions.interaction_date,
         notes: interactions.notes,
         created_at: interactions.created_at,
@@ -147,9 +137,6 @@ export class InteractionService {
 
   /**
    * Verify an application belongs to a user
-   * @param applicationId ID of the application
-   * @param userId ID of the user
-   * @throws NotFoundError if application doesn't exist or doesn't belong to user
    */
   private async verifyApplicationOwnership(
     applicationId: number,
@@ -169,9 +156,6 @@ export class InteractionService {
 
   /**
    * Verify a contact belongs to a user
-   * @param contactId ID of the contact
-   * @param userId ID of the user
-   * @throws NotFoundError if contact doesn't exist or doesn't belong to user
    */
   private async verifyContactOwnership(
     contactId: number,
@@ -189,10 +173,6 @@ export class InteractionService {
 
   /**
    * Create a new interaction
-   * @param userId ID of the user
-   * @param data New interaction data
-   * @return Created interaction
-   * @throws NotFoundError if application or contact doesn't belong to user
    */
   async create(userId: number, data: NewInteraction): Promise<Interaction> {
     // Verify application belongs to user
@@ -209,6 +189,7 @@ export class InteractionService {
         application_id: data.application_id,
         contact_id: data.contact_id,
         interaction_type: data.interaction_type,
+        direction: data.direction,
         interaction_date: data.interaction_date,
         notes: data.notes,
       })
@@ -219,11 +200,6 @@ export class InteractionService {
 
   /**
    * Update an interaction
-   * @param interactionId ID of the interaction
-   * @param userId ID of the user
-   * @param data Updated interaction data
-   * @return Updated interaction
-   * @throws NotFoundError if interaction, application, or contact doesn't exist/belong to user
    */
   async update(
     interactionId: number,
@@ -247,8 +223,9 @@ export class InteractionService {
       .update(interactions)
       .set({
         application_id: data.application_id,
-        contact_id: data.contact_id,
+        contact_id: data.contact_id === null ? null : data.contact_id,
         interaction_type: data.interaction_type,
+        direction: data.direction,
         interaction_date: data.interaction_date,
         notes: data.notes,
       })
@@ -260,9 +237,6 @@ export class InteractionService {
 
   /**
    * Delete an interaction
-   * @param interactionId ID of the interaction
-   * @param userId ID of the user
-   * @throws NotFoundError if interaction doesn't exist or doesn't belong to user
    */
   async delete(interactionId: number, userId: number): Promise<void> {
     // Verify interaction exists and belongs to user

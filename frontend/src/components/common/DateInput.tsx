@@ -88,7 +88,7 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm font-medium text-text-secondary"
           >
             {label}
           </label>
@@ -101,14 +101,16 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
           type="date"
           value={effectiveValue}
           className={`
-            block w-full px-3 py-2 rounded-md border shadow-sm text-sm
+            block w-full px-[var(--padding-input-x)] py-[var(--padding-input-y)] rounded-[var(--radius-md)] border shadow-sm text-sm
+            bg-surface text-text
             focus:outline-none focus:ring-2 focus:ring-offset-0
-            disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
+            disabled:bg-surface-alt disabled:text-text-muted disabled:cursor-not-allowed
+            transition-colors duration-150
             ${error
-              ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+              ? 'border-danger focus:border-danger focus:ring-danger'
               : isPastDate
-                ? 'border-amber-300 focus:border-amber-500 focus:ring-amber-500'
-                : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                ? 'border-warning focus:border-warning focus:ring-warning'
+                : 'border-border focus:border-border-focus focus:ring-border-focus'
             }
             ${className}
           `}
@@ -121,7 +123,7 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
 
         {/* Error message */}
         {error && (
-          <p id={`${inputId}-error`} className="text-sm text-red-600">
+          <p id={`${inputId}-error`} className="text-sm text-danger-text">
             {error}
           </p>
         )}
@@ -130,9 +132,9 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
         {displayHelperText && !error && (
           <p
             id={`${inputId}-helper`}
-            className={`text-sm ${isPastDate ? 'text-amber-600' : 'text-gray-500'}`}
+            className={`text-sm ${isPastDate ? 'text-warning-text' : 'text-text-muted'}`}
           >
-            {isPastDate && '⚠ '}
+            {isPastDate && '\u26A0 '}
             {displayHelperText}
           </p>
         )}

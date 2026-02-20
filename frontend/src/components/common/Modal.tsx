@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 type ModalSize = 'sm' | 'md' | 'lg';
 
@@ -46,6 +47,8 @@ export function Modal({
   children,
   size = 'md',
 }: ModalProps) {
+  const trapRef = useFocusTrap(isOpen);
+
   // Close on Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -70,15 +73,16 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 transition-opacity"
+        className="absolute inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Modal content */}
       <div
+        ref={trapRef}
         className={`
-          relative bg-white rounded-lg shadow-xl w-full mx-4
+          relative bg-surface-elevated rounded-[var(--radius-lg)] shadow-xl w-full mx-4
           ${sizeStyles[size]}
           animate-in fade-in zoom-in-95 duration-200
         `}
@@ -87,16 +91,16 @@ export function Modal({
         aria-labelledby="modal-title"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2
             id="modal-title"
-            className="text-lg font-semibold text-gray-900"
+            className="text-lg font-semibold text-text"
           >
             {title}
           </h2>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100 transition-colors"
+            className="p-1 text-text-placeholder hover:text-text-secondary rounded-[var(--radius-md)] hover:bg-surface-alt transition-colors"
             aria-label="Close modal"
           >
             <svg

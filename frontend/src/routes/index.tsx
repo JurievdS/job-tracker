@@ -1,21 +1,28 @@
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
 import { ROUTES } from './routes';
 
 // Layouts
 import { MainLayout } from '@/components/layout/MainLayout';
+import { PublicLayout } from '@/components/layout/PublicLayout';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 
 // Pages
-import { LoginPage, RegisterPage, OAuthCallbackPage } from '@/pages/auth';
+import { LandingPage } from '@/pages/LandingPage';
+import { LoginPage, RegisterPage, OAuthCallbackPage, ForgotPasswordPage, ResetPasswordPage } from '@/pages/auth';
 import { DashboardPage } from '@/pages/dashboard';
 import { ApplicationsPage } from '@/pages/applications';
 import { CompaniesPage } from '@/pages/companies';
-import { PositionsPage } from '@/pages/positions';
+import { ContactsPage } from '@/pages/contacts';
 import { InteractionsPage } from '@/pages/interactions';
 import { RemindersPage } from '@/pages/reminders';
+import { SourcesPage } from '@/pages/sources';
+import { VisaTypesPage } from '@/pages/visaTypes';
+import { ProfilePage } from '@/pages/profile';
+import { SettingsPage } from '@/pages/settings';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { RouteErrorFallback } from '@/components/common';
 
 /**
  * Router Configuration
@@ -26,7 +33,17 @@ const router = createBrowserRouter([
   // ============================================
   {
     element: <PublicRoute />,
+    errorElement: <RouteErrorFallback />,
     children: [
+      {
+        element: <PublicLayout />,
+        children: [
+          {
+            path: ROUTES.HOME,
+            element: <LandingPage />,
+          },
+        ],
+      },
       {
         element: <AuthLayout />,
         children: [
@@ -37,6 +54,14 @@ const router = createBrowserRouter([
           {
             path: ROUTES.REGISTER,
             element: <RegisterPage />,
+          },
+          {
+            path: ROUTES.FORGOT_PASSWORD,
+            element: <ForgotPasswordPage />,
+          },
+          {
+            path: ROUTES.RESET_PASSWORD,
+            element: <ResetPasswordPage />,
           },
         ],
       },
@@ -49,6 +74,7 @@ const router = createBrowserRouter([
   {
     path: ROUTES.AUTH_CALLBACK,
     element: <OAuthCallbackPage />,
+    errorElement: <RouteErrorFallback />,
   },
 
   // ============================================
@@ -56,15 +82,11 @@ const router = createBrowserRouter([
   // ============================================
   {
     element: <ProtectedRoute />,
+    errorElement: <RouteErrorFallback />,
     children: [
       {
         element: <MainLayout />,
         children: [
-          // Redirect root to dashboard when authenticated
-          {
-            path: ROUTES.HOME,
-            element: <Navigate to={ROUTES.DASHBOARD} replace />,
-          },
           {
             path: ROUTES.DASHBOARD,
             element: <DashboardPage />,
@@ -78,8 +100,8 @@ const router = createBrowserRouter([
             element: <CompaniesPage />,
           },
           {
-            path: ROUTES.POSITIONS,
-            element: <PositionsPage />,
+            path: ROUTES.CONTACTS,
+            element: <ContactsPage />,
           },
           {
             path: ROUTES.INTERACTIONS,
@@ -88,6 +110,22 @@ const router = createBrowserRouter([
           {
             path: ROUTES.REMINDERS,
             element: <RemindersPage />,
+          },
+          {
+            path: ROUTES.SOURCES,
+            element: <SourcesPage />,
+          },
+          {
+            path: ROUTES.VISA_TYPES,
+            element: <VisaTypesPage />,
+          },
+          {
+            path: ROUTES.PROFILE,
+            element: <ProfilePage />,
+          },
+          {
+            path: ROUTES.SETTINGS,
+            element: <SettingsPage />,
           }
         ],
       },

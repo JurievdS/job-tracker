@@ -1,4 +1,4 @@
-import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core';
+import { DndContext, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { LoadingSpinner, EmptyState, StatusBadge } from '@/components/common';
 import {
   APPLICATION_STATUSES,
@@ -12,7 +12,6 @@ interface KanbanBoardProps {
   applications: Application[];
   setApplications: React.Dispatch<React.SetStateAction<Application[]>>;
   isLoading: boolean;
-  error: string | null;
   onError: (message: string) => void;
   onCardClick: (application: Application) => void;
   onAddApplication: () => void;
@@ -32,11 +31,14 @@ export function KanbanBoard({
   applications,
   setApplications,
   isLoading,
-  error,
   onError,
   onCardClick,
   onAddApplication,
 }: KanbanBoardProps) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
   const {
     activeApplication,
     isUpdating,
@@ -80,7 +82,7 @@ export function KanbanBoard({
       {/* Updating indicator */}
       {isUpdating && (
         <div className="absolute top-2 right-2 z-10">
-          <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm flex items-center gap-2">
+          <div className="bg-info-light text-info-text px-3 py-1 rounded-full text-sm flex items-center gap-2">
             <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -90,21 +92,15 @@ export function KanbanBoard({
         </div>
       )}
 
-      {/* Error display */}
-      {error && (
-        <div className="mb-4 bg-red-50 text-red-700 p-4 rounded-md">
-          {error}
-        </div>
-      )}
-
       {/* Kanban board */}
       <DndContext
+        sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="flex gap-4 overflow-x-auto pb-4 max-md:flex-col max-md:overflow-x-visible">
           {APPLICATION_STATUSES.map(({ value, label }) => (
             <KanbanColumn
               key={value}
@@ -119,16 +115,16 @@ export function KanbanBoard({
         {/* Drag overlay - visual feedback while dragging */}
         <DragOverlay>
           {activeApplication ? (
-            <div className="rotate-3 scale-105 w-60">
-              <div className="bg-white rounded-lg shadow-xl border-2 border-blue-400 p-3">
+            <div className="scale-[1.02] w-64 opacity-90">
+              <div className="bg-surface rounded-[var(--radius-lg)] shadow-lg border border-primary/50 p-3">
                 <div className="space-y-2">
-                  <p className="font-medium text-gray-900 text-sm truncate">
+                  <p className="font-medium text-text text-sm truncate">
                     {activeApplication.company_name}
                   </p>
-                  <p className="text-gray-600 text-xs truncate">
-                    {activeApplication.position_title}
+                  <p className="text-text-secondary text-xs truncate">
+                    {activeApplication.job_title}
                   </p>
-                  <StatusBadge status={activeApplication.status} />
+                  <StatusBadge status={activeApplication.status || 'bookmarked'} />
                 </div>
               </div>
             </div>

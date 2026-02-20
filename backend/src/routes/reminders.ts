@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../middleware/errorHandler.js";
+import { authenticate } from "../middleware/auth.js";
 import { ReminderController } from "../controllers/ReminderController.js";
 import { ReminderService } from "../services/ReminderService.js";
 
@@ -45,7 +46,7 @@ const controller = new ReminderController(reminderService);
  *       200:
  *         description: List of reminders
  */
-router.get("/", asyncHandler(controller.list));
+router.get("/", authenticate, asyncHandler(controller.list));
 
 /**
  * @swagger
@@ -65,7 +66,7 @@ router.get("/", asyncHandler(controller.list));
  *       404:
  *         description: Reminder not found
  */
-router.get("/:id", asyncHandler(controller.getById));
+router.get("/:id", authenticate, asyncHandler(controller.getById));
 
 /**
  * @swagger
@@ -83,7 +84,7 @@ router.get("/:id", asyncHandler(controller.getById));
  *       201:
  *         description: Reminder created
  */
-router.post("/", asyncHandler(controller.create));
+router.post("/", authenticate, asyncHandler(controller.create));
 
 /**
  * @swagger
@@ -103,7 +104,7 @@ router.post("/", asyncHandler(controller.create));
  *       404:
  *         description: Reminder not found
  */
-router.patch("/:id/complete", asyncHandler(controller.markComplete));
+router.patch("/:id/complete", authenticate, asyncHandler(controller.markComplete));
 
 /**
  * @swagger
@@ -123,6 +124,6 @@ router.patch("/:id/complete", asyncHandler(controller.markComplete));
  *       404:
  *         description: Reminder not found
  */
-router.delete("/:id", asyncHandler(controller.delete));
+router.delete("/:id", authenticate, asyncHandler(controller.delete));
 
 export default router;

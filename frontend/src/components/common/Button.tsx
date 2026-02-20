@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -17,16 +17,17 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-  secondary: 'bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-gray-500',
-  danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-  ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
+  primary: 'bg-primary text-primary-foreground hover:bg-primary-hover focus:ring-primary',
+  secondary: 'bg-surface-alt text-text hover:bg-border focus:ring-border',
+  danger: 'bg-danger text-white hover:brightness-110 focus:ring-danger',
+  ghost: 'bg-transparent text-text hover:bg-surface-alt focus:ring-border',
+  outline: 'border border-border bg-transparent text-text hover:bg-surface-alt focus:ring-border',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-sm',
-  md: 'px-4 py-2 text-sm',
-  lg: 'px-6 py-3 text-base',
+  sm: 'px-[var(--padding-button-sm-x)] py-[var(--padding-button-sm-y)] text-sm',
+  md: 'px-[var(--padding-button-md-x)] py-[var(--padding-button-md-y)] text-sm',
+  lg: 'px-[var(--padding-button-lg-x)] py-[var(--padding-button-lg-y)] text-base',
 };
 
 /**
@@ -54,9 +55,10 @@ export function Button({
   return (
     <button
       className={`
-        inline-flex items-center justify-center gap-2 font-medium rounded-md
-        transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
+        inline-flex items-center justify-center gap-2 font-medium rounded-[var(--radius-md)]
+        transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 ring-offset-[var(--color-ring-offset)]
         disabled:opacity-50 disabled:cursor-not-allowed
+        active:scale-[0.98]
         ${variantStyles[variant]}
         ${sizeStyles[size]}
         ${className}

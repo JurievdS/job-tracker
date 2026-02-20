@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { tokenStorage } from '@/utils/storage';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/routes/routes';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+
+const friendlyErrors: Record<string, string> = {
+  access_denied: 'You declined the sign-in request.',
+  invalid_grant: 'The sign-in session expired. Please try again.',
+};
 
 /**
  * OAuthCallbackPage - Handles OAuth redirect from backend
@@ -19,7 +24,7 @@ export function OAuthCallbackPage() {
       // Check for error from OAuth provider
       const errorParam = searchParams.get('error');
       if (errorParam) {
-        setError(`Authentication failed: ${errorParam}`);
+        setError(friendlyErrors[errorParam] || 'Something went wrong during sign-in. Please try again.');
         // Redirect to login after showing error
         setTimeout(() => navigate(ROUTES.LOGIN), 3000);
         return;
@@ -54,11 +59,17 @@ export function OAuthCallbackPage() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
-        <div className="bg-white p-8 rounded-lg shadow-md text-center max-w-md">
-          <div className="text-red-500 text-5xl mb-4">!</div>
-          <p className="text-red-600 mb-4">{error}</p>
-          <p className="text-gray-500 text-sm">Redirecting to login...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+        <div className="bg-surface p-8 rounded-[var(--radius-lg)] shadow-md border border-border text-center max-w-md">
+          <div className="text-danger text-5xl mb-4">!</div>
+          <p role="alert" className="text-danger mb-4">{error}</p>
+          <Link
+            to={ROUTES.LOGIN}
+            className="inline-block text-sm font-medium text-primary hover:underline mb-3"
+          >
+            Back to login
+          </Link>
+          <p className="text-text-muted text-sm">Redirecting to login...</p>
         </div>
       </div>
     );
@@ -66,10 +77,10 @@ export function OAuthCallbackPage() {
 
   // Loading state
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-md text-center">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+      <div className="bg-surface p-8 rounded-[var(--radius-lg)] shadow-md border border-border text-center">
         <LoadingSpinner />
-        <p className="mt-4 text-gray-600">Completing authentication...</p>
+        <p className="mt-4 text-text-secondary">Completing authentication...</p>
       </div>
     </div>
   );

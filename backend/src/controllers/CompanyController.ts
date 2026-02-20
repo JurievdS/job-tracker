@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { CompanyService } from "../services/CompanyService.js";
-import { CompanySchema, UserCompanyNotesSchema } from "../schemas/companies.js";
+import { CompanySchema, UpdateCompanySchema, UserCompanyNotesSchema } from "../schemas/companies.js";
 
 /**
  * Company Controller
@@ -60,6 +60,28 @@ export class CompanyController {
     const data = CompanySchema.parse(req.body);
     const company = await this.companyService.create(data);
     res.status(201).json(company);
+  };
+
+  /**
+   * PUT /companies/:id
+   * Update a company (global)
+   * Returns the updated company
+   */
+  update = async (req: Request, res: Response) => {
+    const companyId = Number(req.params.id);
+    const data = UpdateCompanySchema.parse(req.body);
+    const company = await this.companyService.update(companyId, data);
+    res.json(company);
+  };
+
+  /**
+   * DELETE /companies/:id
+   * Delete a company (global)
+   */
+  delete = async (req: Request, res: Response) => {
+    const companyId = Number(req.params.id);
+    await this.companyService.delete(companyId);
+    res.status(204).send();
   };
 
   // ==================== User Notes Endpoints ====================

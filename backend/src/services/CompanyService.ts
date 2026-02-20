@@ -11,6 +11,7 @@ type UserCompanyNote = typeof userCompanyNotes.$inferSelect;
 
 // Company with user's personal notes attached
 export interface CompanyWithNotes extends Company {
+  industry: string | null;
   user_notes?: string | null;
   user_rating?: number | null;
 }
@@ -41,6 +42,7 @@ export class CompanyService {
         normalized_name: companies.normalized_name,
         website: companies.website,
         location: companies.location,
+        industry: companies.industry,
         created_at: companies.created_at,
         user_notes: userCompanyNotes.notes,
         user_rating: userCompanyNotes.rating,
@@ -66,7 +68,8 @@ export class CompanyService {
     return db
       .select()
       .from(companies)
-      .where(ilike(companies.name, `%${term}%`));
+      .where(ilike(companies.name, `%${term}%`))
+      .limit(20);
   }
 
   /**
@@ -103,6 +106,7 @@ export class CompanyService {
         normalized_name: companies.normalized_name,
         website: companies.website,
         location: companies.location,
+        industry: companies.industry,
         created_at: companies.created_at,
         user_notes: userCompanyNotes.notes,
         user_rating: userCompanyNotes.rating,
@@ -190,10 +194,53 @@ export class CompanyService {
         normalized_name: normalizedName,
         website: data.website,
         location: data.location,
+        industry: data.industry,
       })
       .returning();
 
     return company;
+  }
+
+  /**
+   * Update a company (global)
+   * @param companyId ID of the company to update
+   * @param data Partial company data
+   * @return Updated company
+   * @throws NotFoundError if company doesn't exist
+   * @throws ConflictError if new name conflicts with another company
+   */
+  async update(companyId: number, data: UpdateCompany): Promise<Company> {
+    await this.findByIdOrThrow(companyId);
+
+    // If name is being changed, check for conflicts
+    if (data.name) {
+      const normalizedName = normalizeCompanyName(data.name);
+      const existing = await this.findByNormalizedName(normalizedName);
+      if (existing && existing.id !== companyId) {
+        throw new ConflictError(
+          `A similar company already exists: "${existing.name}". Use the existing company or provide a more distinct name.`
+        );
+      }
+      (data as Record<string, unknown>).normalized_name = normalizedName;
+    }
+
+    const [updated] = await db
+      .update(companies)
+      .set(data as Record<string, unknown>)
+      .where(eq(companies.id, companyId))
+      .returning();
+
+    return updated;
+  }
+
+  /**
+   * Delete a company (global)
+   * @param companyId ID of the company to delete
+   * @throws NotFoundError if company doesn't exist
+   */
+  async delete(companyId: number): Promise<void> {
+    await this.findByIdOrThrow(companyId);
+    await db.delete(companies).where(eq(companies.id, companyId));
   }
 
   /**

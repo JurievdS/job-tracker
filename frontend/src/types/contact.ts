@@ -7,6 +7,7 @@ export interface Contact {
   name: string;
   role: string | null;
   email: string | null;
+  phone: string | null;
   linkedin: string | null;
   notes: string | null;
   created_at: string;
@@ -21,6 +22,7 @@ export interface CreateContactDto {
   company_id: number;
   role?: string;
   email?: string;
+  phone?: string;
   linkedin?: string;
   notes?: string;
 }
@@ -33,6 +35,7 @@ export interface UpdateContactDto {
   company_id?: number;
   role?: string;
   email?: string;
+  phone?: string;
   linkedin?: string;
   notes?: string;
 }

@@ -1,0 +1,2 @@
+ALTER TABLE "applications" ADD COLUMN "visa_type_id" integer;--> statement-breakpoint
+ALTER TABLE "applications" ADD CONSTRAINT "applications_visa_type_id_visa_types_id_fk" FOREIGN KEY ("visa_type_id") REFERENCES "public"."visa_types"("id") ON DELETE set null ON UPDATE no action;

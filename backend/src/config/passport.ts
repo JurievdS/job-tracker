@@ -2,16 +2,16 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as GitHubStrategy } from "passport-github2";
 import { db } from "../db/index.js";
-import { users } from "../db/schema.js";
+import { users, userProfiles } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
-const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || "http://localhost:3001/auth/google/callback";
+const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || "http://localhost:3001/api/auth/google/callback";
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || "";
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || "";
-const GITHUB_CALLBACK_URL = process.env.GITHUB_CALLBACK_URL || "http://localhost:3001/auth/github/callback";
+const GITHUB_CALLBACK_URL = process.env.GITHUB_CALLBACK_URL || "http://localhost:3001/api/auth/github/callback";
 
 export interface OAuthUser {
   id: number;
@@ -86,6 +86,12 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
               avatar_url: avatarUrl,
             })
             .returning();
+
+          // Create user profile with pre-populated name
+          await db.insert(userProfiles).values({
+            user_id: newUser[0].id,
+            full_name: name,
+          });
 
           const user: OAuthUser = {
             id: newUser[0].id,
@@ -178,6 +184,12 @@ if (GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET) {
               avatar_url: avatarUrl,
             })
             .returning();
+
+          // Create user profile with pre-populated name
+          await db.insert(userProfiles).values({
+            user_id: newUser[0].id,
+            full_name: name,
+          });
 
           const user: OAuthUser = {
             id: newUser[0].id,

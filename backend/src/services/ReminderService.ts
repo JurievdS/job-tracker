@@ -1,5 +1,5 @@
 import { db } from "../db/index.js";
-import { reminders, applications, positions, companies } from "../db/schema.js";
+import { reminders, applications, companies } from "../db/schema.js";
 import { eq, and, lte, asc, sql } from "drizzle-orm";
 import { NotFoundError } from "../errors/index.js";
 import type { NewReminder } from "../schemas/reminders.js";
@@ -15,8 +15,8 @@ export interface ReminderWithDetails {
   message: string | null;
   completed: boolean | null;
   created_at: Date | null;
-  position_title: string;
-  company_name: string;
+  job_title: string;
+  company_name: string | null;
 }
 
 /**
@@ -26,9 +26,6 @@ export class ReminderService {
 
   /**
    * Get all reminders for a user with optional pending filter
-   * @param userId ID of the user
-   * @param pending If true, only return uncompleted reminders due today or earlier
-   * @return List of reminders with related details
    */
   async findAll(
     userId: number,
@@ -42,13 +39,12 @@ export class ReminderService {
         message: reminders.message,
         completed: reminders.completed,
         created_at: reminders.created_at,
-        position_title: positions.title,
+        job_title: applications.job_title,
         company_name: companies.name,
       })
       .from(reminders)
       .innerJoin(applications, eq(reminders.application_id, applications.id))
-      .innerJoin(positions, eq(applications.position_id, positions.id))
-      .innerJoin(companies, eq(positions.company_id, companies.id))
+      .leftJoin(companies, eq(applications.company_id, companies.id))
       .orderBy(asc(reminders.reminder_date));
 
     if (pending) {
@@ -66,10 +62,6 @@ export class ReminderService {
 
   /**
    * Get a reminder by ID with related details
-   * @param reminderId ID of the reminder
-   * @param userId ID of the user
-   * @return Reminder with related details
-   * @throws NotFoundError if reminder doesn't exist or doesn't belong to user
    */
   async findByIdWithDetails(
     reminderId: number,
@@ -83,13 +75,12 @@ export class ReminderService {
         message: reminders.message,
         completed: reminders.completed,
         created_at: reminders.created_at,
-        position_title: positions.title,
+        job_title: applications.job_title,
         company_name: companies.name,
       })
       .from(reminders)
       .innerJoin(applications, eq(reminders.application_id, applications.id))
-      .innerJoin(positions, eq(applications.position_id, positions.id))
-      .innerJoin(companies, eq(positions.company_id, companies.id))
+      .leftJoin(companies, eq(applications.company_id, companies.id))
       .where(
         and(eq(reminders.id, reminderId), eq(applications.user_id, userId))
       );
@@ -103,10 +94,6 @@ export class ReminderService {
 
   /**
    * Get a reminder by ID (verifies ownership via application)
-   * @param reminderId ID of the reminder
-   * @param userId ID of the user
-   * @return Reminder
-   * @throws NotFoundError if reminder doesn't exist or doesn't belong to user
    */
   async findByIdOrThrow(reminderId: number, userId: number): Promise<Reminder> {
     const result = await db
@@ -133,10 +120,6 @@ export class ReminderService {
 
   /**
    * Verify an application belongs to a user
-   * @param applicationId ID of the application
-   * @param userId ID of the user
-   * @return void
-   * @throws NotFoundError if application doesn't exist or doesn't belong to user
    */
   private async verifyApplicationOwnership(
     applicationId: number,
@@ -156,10 +139,6 @@ export class ReminderService {
 
   /**
    * Create a new reminder
-   * @param userId ID of the user
-   * @param data New reminder data
-   * @return Created reminder
-   * @throws NotFoundError if application doesn't belong to user
    */
   async create(userId: number, data: NewReminder): Promise<Reminder> {
     // Verify application belongs to user
@@ -179,10 +158,6 @@ export class ReminderService {
 
   /**
    * Mark a reminder as completed
-   * @param reminderId ID of the reminder
-   * @param userId ID of the user
-   * @return Updated reminder
-   * @throws NotFoundError if reminder doesn't exist or doesn't belong to user
    */
   async markComplete(reminderId: number, userId: number): Promise<Reminder> {
     // Verify reminder exists and belongs to user
@@ -199,10 +174,6 @@ export class ReminderService {
 
   /**
    * Delete a reminder
-   * @param reminderId ID of the reminder
-   * @param userId ID of the user
-   * @return void
-   * @throws NotFoundError if reminder doesn't exist or doesn't belong to user
    */
   async delete(reminderId: number, userId: number): Promise<void> {
     // Verify reminder exists and belongs to user

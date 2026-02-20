@@ -3,8 +3,15 @@ import applicationsRouter from "./applications.js";
 import companyRouter from "./companies.js";
 import contactsRouter from "./contacts.js";
 import interactionsRouter from "./interactions.js";
-import positionsRouter from "./positions.js";
 import remindersRouter from "./reminders.js";
+import profileRouter from "./profile.js";
+import documentsRouter from "./documents.js";
+import formTemplatesRouter from "./formTemplates.js";
+import tagsRouter from "./tags.js";
+import sourcesRouter from "./sources.js";
+import workAuthorizationsRouter from "./workAuthorizations.js";
+import visaTypesRouter from "./visaTypes.js";
+import visaRequirementsRouter from "./visaRequirements.js";
 
 const router = Router();
 
@@ -25,7 +32,14 @@ router.use("/applications", applicationsRouter);
 router.use("/companies", companyRouter);
 router.use("/contacts", contactsRouter);
 router.use("/interactions", interactionsRouter);
-router.use("/positions", positionsRouter);
 router.use("/reminders", remindersRouter);
+router.use("/profile", profileRouter);
+router.use("/documents", documentsRouter);
+router.use("/form-templates", formTemplatesRouter);
+router.use("/tags", tagsRouter);
+router.use("/sources", sourcesRouter);
+router.use("/work-authorizations", workAuthorizationsRouter);
+router.use("/visa-types", visaTypesRouter);
+router.use("/visa-requirements", visaRequirementsRouter);
 
 export default router;

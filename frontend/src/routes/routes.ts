@@ -7,6 +7,8 @@ export const ROUTES = {
   LOGIN: '/login',
   REGISTER: '/register',
   AUTH_CALLBACK: '/auth/callback', // OAuth callback handler
+  FORGOT_PASSWORD: '/forgot-password',
+  RESET_PASSWORD: '/reset-password',
 
   // Protected routes
   DASHBOARD: '/dashboard',
@@ -15,9 +17,11 @@ export const ROUTES = {
   COMPANIES: '/companies',
   COMPANY_DETAIL: '/companies/:id',
   CONTACTS: '/contacts',
-  POSITIONS: '/positions',
   INTERACTIONS: '/interactions',
   REMINDERS: '/reminders',
+  SOURCES: '/sources',
+  VISA_TYPES: '/visa-types',
+  PROFILE: '/profile',
   SETTINGS: '/settings',
 } as const;
 

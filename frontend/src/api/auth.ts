@@ -76,4 +76,28 @@ export const authApi = {
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     return `${baseUrl}/auth/github`;
   },
+
+  /**
+   * Request password reset email
+   * POST /auth/forgot-password
+   */
+  forgotPassword: async (email: string): Promise<{ message: string }> => {
+    const response = await apiClient.post<{ message: string }>(
+      '/auth/forgot-password',
+      { email }
+    );
+    return response.data;
+  },
+
+  /**
+   * Reset password with token
+   * POST /auth/reset-password
+   */
+  resetPassword: async (token: string, password: string): Promise<{ message: string }> => {
+    const response = await apiClient.post<{ message: string }>(
+      '/auth/reset-password',
+      { token, password }
+    );
+    return response.data;
+  },
 };
