@@ -1,7 +1,7 @@
 // ─── Theme Types ────────────────────────────────────────────────────────────
 
 export type ColorMode = 'light' | 'dark' | 'system';
-export type ThemePalette = 'default' | 'cyberpunk';
+export type ThemePalette = 'default' | 'cyberpunk' | 'nord' | 'dracula' | 'solarized' | 'gruvbox' | 'tokyo-night' | 'catppuccin';
 export type Density = 'compact' | 'comfortable' | 'spacious';
 export type FontSize = 'small' | 'medium' | 'large';
 export type SidebarPosition = 'left' | 'right';
@@ -50,6 +50,42 @@ export const PALETTES: PaletteInfo[] = [
     label: 'Cyberpunk',
     description: 'Neon cyan on dark',
     swatches: { primary: '#22d3ee', surface: '#1a1a2e', text: '#e0f2fe' },
+  },
+  {
+    id: 'nord',
+    label: 'Nord',
+    description: 'Arctic, bluish clean',
+    swatches: { primary: '#88c0d0', surface: '#eceff4', text: '#2e3440' },
+  },
+  {
+    id: 'dracula',
+    label: 'Dracula',
+    description: 'Vibrant purple on dark',
+    swatches: { primary: '#bd93f9', surface: '#282a36', text: '#f8f8f2' },
+  },
+  {
+    id: 'solarized',
+    label: 'Solarized',
+    description: 'Warm precision palette',
+    swatches: { primary: '#268bd2', surface: '#fdf6e3', text: '#073642' },
+  },
+  {
+    id: 'gruvbox',
+    label: 'Gruvbox',
+    description: 'Retro earthy groovy',
+    swatches: { primary: '#d79921', surface: '#fbf1c7', text: '#3c3836' },
+  },
+  {
+    id: 'tokyo-night',
+    label: 'Tokyo Night',
+    description: 'Neon city night blues',
+    swatches: { primary: '#7aa2f7', surface: '#1a1b26', text: '#c0caf5' },
+  },
+  {
+    id: 'catppuccin',
+    label: 'Catppuccin',
+    description: 'Soothing pastel tones',
+    swatches: { primary: '#cba6f7', surface: '#1e1e2e', text: '#cdd6f4' },
   },
 ];
 

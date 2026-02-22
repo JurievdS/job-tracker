@@ -103,21 +103,21 @@ function AppearanceTab() {
       <div>
         <h3 className="text-sm font-medium text-text mb-1">Theme Palette</h3>
         <p className="text-xs text-text-muted mb-3">Choose a visual theme for the entire app</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {PALETTES.map((palette) => {
             const isActive = settings.palette === palette.id;
             return (
               <button
                 key={palette.id}
                 onClick={() => updateSettings({ palette: palette.id as ThemePalette })}
-                className={`flex items-center gap-3 p-4 rounded-[var(--radius-lg)] border-2 text-left transition-colors ${
+                className={`flex flex-col items-center gap-2 p-3 rounded-[var(--radius-lg)] border-2 text-center transition-colors ${
                   isActive
                     ? 'border-primary bg-primary-light'
                     : 'border-border hover:border-border-hover'
                 }`}
               >
                 {/* Preview swatches */}
-                <div className="flex -space-x-1 flex-shrink-0">
+                <div className="flex -space-x-1">
                   <div
                     className="w-6 h-6 rounded-full border-2 border-surface"
                     style={{ backgroundColor: palette.swatches.primary }}
